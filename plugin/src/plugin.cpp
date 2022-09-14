@@ -3,7 +3,7 @@
 #include <tier1/tier1.h>
 #include <tier2/tier2.h>
 #include <engine/iserverplugin.h>
-#include "suftree.hpp"
+#include "module.hpp"
 
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
     return localtime_r(timep, result);
@@ -11,25 +11,13 @@ struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
 
 class CMPPatchPlugin : public IServerPluginCallbacks {
     public:
-        void test(const CSuffixTree& tree, const char *str) {
-            CStringSequence needle(str);
-            size_t off;
-            if(tree.find_needle(needle, &off)) {
-                Msg("'%s': needle found at unique offset %lu\n", str, off);
-            } else Msg("'%s': needle not found\n", str);
-        }
-
         //Server callbacks
         virtual bool Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory) {
             ConnectTier1Libraries(&interfaceFactory, 1);
             ConnectTier2Libraries(&interfaceFactory, 1);
 
-            CStringSequence seq("abcdefabxybcdmnabcdex");
-            CSuffixTree tree(seq);
-            test(tree, "abcdef");
-            test(tree, "xyz");
-            test(tree, "abcd");
-            test(tree, "abcdex");
+            CModule engine_mod("engine"), matchmaking_mod("matchmaking"), server_mod("server");
+
             return true;
         }
 
