@@ -75,6 +75,15 @@ CSuffixTree::CSuffixTree(const IByteSequence& seq) : m_Sequence(seq), m_LeafSuff
     setup_suffixes(size, m_RootNode, 0);
 }
 
+CSuffixTree::CSuffixTree(CSuffixTree& tree) : m_Sequence(tree.m_Sequence), m_LeafSuffixEnd(tree.m_LeafSuffixEnd), m_RootNode(tree.m_RootNode), m_MemUsage(tree.m_MemUsage) {
+    for(int i = 0; i < NUM_ORDERS; i++) {
+        m_NodePoolPages[i] = tree.m_NodePoolPages[i];
+        tree.m_NodePoolPages[i] = nullptr;
+        m_NodePoolFreeHead[i] = tree.m_NodePoolFreeHead[i];
+        tree.m_NodePoolFreeHead[i] = nullptr;
+    }
+}
+
 CSuffixTree::~CSuffixTree() {
     //Free the node pool
     for(int i = 0; i < NUM_ORDERS; i++) {

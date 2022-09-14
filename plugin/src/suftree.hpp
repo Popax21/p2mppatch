@@ -6,6 +6,7 @@
 class CSuffixTree {
     public:
         CSuffixTree(const IByteSequence& seq);
+        CSuffixTree(CSuffixTree& tree);
         ~CSuffixTree();
 
         inline const IByteSequence& get_sequence() const { return m_Sequence; }
