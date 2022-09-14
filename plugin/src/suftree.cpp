@@ -120,7 +120,7 @@ inline void CSuffixTree::build_tree(size_t seq_size) {
     //Iterative expansion
     tree_node *actv_node = m_RootNode;
     tree_node_ref *actv_node_ref = &m_RootNode;
-    uint8_t actv_len = 0, actv_off = 0;
+    size_t actv_len = 0, actv_off = 0;
 
     size_t rem_suffixes = 0;
     for(size_t cur_off = 0; cur_off < seq_size; cur_off++) {
@@ -135,7 +135,7 @@ inline void CSuffixTree::build_tree(size_t seq_size) {
         rem_suffixes++;
         while(rem_suffixes > 0) {
             //Set the active symbol to the current one when branching
-            tree_node_ref *actv_edge_node_ref;
+            tree_node_ref *actv_edge_node_ref = nullptr;
             while(true) {
                 uint8_t actv_sym;
                 if(actv_len <= 0) {
@@ -144,15 +144,14 @@ inline void CSuffixTree::build_tree(size_t seq_size) {
                 } else actv_sym = m_Sequence[actv_off];
 
                 //Get the child along the active edge
-                actv_edge_node_ref = (*actv_node)[m_Sequence[actv_off]];
+                actv_edge_node_ref = (*actv_node)[actv_sym];
                 if(!actv_edge_node_ref) break;
 
                 //Check if we can go down the edge
                 size_t lab_sz = (*actv_edge_node_ref)->label_size(*this);
                 if(actv_len < lab_sz) break;
 
-                actv_node = *actv_edge_node_ref;
-                actv_node_ref = actv_edge_node_ref;
+                actv_node = *(actv_node_ref = actv_edge_node_ref);
                 actv_len -= lab_sz;
                 actv_off += lab_sz;
             }
@@ -193,7 +192,7 @@ inline void CSuffixTree::build_tree(size_t seq_size) {
             if(actv_node == m_RootNode && actv_len > 0) {
                 actv_len--;
                 actv_off = cur_off - rem_suffixes + 1;
-            } else {
+            } else if(actv_node != m_RootNode) {
                 //Follow suffix link
                 actv_node = *(actv_node_ref = actv_node->suf_link);
             }
