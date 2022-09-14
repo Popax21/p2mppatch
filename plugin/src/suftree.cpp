@@ -34,21 +34,23 @@ struct CSuffixTree::tree_node {
     inline size_t label_size(const CSuffixTree& tree) const { return label_end(tree) - lab_start; }
     inline int order() const { return is_leaf() ? 0 : (order_m1 + 1); }
 
-    tree_node_ref *operator [](uint8_t sym) { return is_leaf() ? nullptr : search_child(0, order_m1+1, sym); }
-    const tree_node_ref *operator [](uint8_t sym) const { return is_leaf() ? nullptr : search_child(0, order_m1+1, sym); }
+    tree_node_ref *operator [](uint8_t sym) {
+        return (tree_node_ref*) (*(const tree_node*) this)[sym];
+    }
 
-    private:
-        tree_node_ref *search_child(int s, int e, uint8_t sym) {
-            if(s == e-1) return (children[s].symbol == sym) ? &children[s].node : nullptr;
+    const tree_node_ref *operator [](uint8_t sym) const {
+        if(is_leaf()) return nullptr;
+
+        int s = 0, e = order_m1+1;
+        while(s < e-1) {
             int m = s + (e-s) / 2;
-            return (sym < children[m].symbol) ? search_child(s, m, sym) : search_child(m, e, sym);
+            if(sym < children[m].symbol) e = m;
+            else s = m;
         }
 
-        const tree_node_ref *search_child(int s, int e, uint8_t sym) const {
-            if(s == e-1) return (children[s].symbol == sym) ? &children[s].node : nullptr;
-            int m = s + (e-s) / 2;
-            return (sym < children[m].symbol) ? search_child(s, m, sym) : search_child(m, e, sym);
-        }
+        if(children[s].symbol != sym) return nullptr;
+        return &children[s].node;
+    }
 } __attribute__((packed));
 
 struct CSuffixTree::npool_page {
