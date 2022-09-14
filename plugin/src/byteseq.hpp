@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <initializer_list>
+
+class CSequentialByteSequence;
 
 class IByteSequence {
     public:
@@ -33,6 +36,40 @@ class IByteSequence {
 
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const = 0;
         virtual uint8_t operator [](size_t off) const = 0;
+};
+
+class CSequentialByteSequence : public IByteSequence {
+    public:
+        CSequentialByteSequence(std::initializer_list<const IByteSequence*> seqs);
+        CSequentialByteSequence(const CSequentialByteSequence &seq);
+        CSequentialByteSequence(CSequentialByteSequence &seq);
+        ~CSequentialByteSequence();
+
+        virtual size_t size() const { return m_Size; };
+
+        virtual bool compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
+        virtual bool compare(const uint8_t *buf, size_t off, size_t size) const;
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const;
+
+        inline virtual uint8_t operator [](size_t off) const {
+            const seq_ent& ent = get_sequence(off);
+            return (*ent.seq)[off - ent.off];
+        }
+
+    private:
+        struct seq_ent {
+            size_t off;
+            const IByteSequence *seq;
+
+            inline seq_ent() {}
+            inline seq_ent(size_t off, const IByteSequence *seq) : off(off), seq(seq) {}
+        };
+
+        const seq_ent& get_sequence(size_t off) const;
+
+        size_t m_Size;
+        int m_NumSeqs;
+        seq_ent *m_Sequences;
 };
 
 class CHexSequence : public IByteSequence {

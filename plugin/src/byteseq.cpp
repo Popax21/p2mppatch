@@ -1,6 +1,79 @@
 #include <stdexcept>
 #include "byteseq.hpp"
 
+CSequentialByteSequence::CSequentialByteSequence(std::initializer_list<const IByteSequence*> seqs) : m_Size(0), m_NumSeqs(0) {
+    m_Sequences = new seq_ent[seqs.size()];
+    for(const IByteSequence *seq : seqs) {
+        m_Sequences[m_NumSeqs++] = seq_ent(m_Size, seq);
+        m_Size += seq->size();
+    }
+}
+
+CSequentialByteSequence::CSequentialByteSequence(const CSequentialByteSequence &seq) : m_Size(seq.m_Size), m_NumSeqs(seq.m_NumSeqs) {
+    m_Sequences = new seq_ent[m_NumSeqs];
+    memcpy(m_Sequences, seq.m_Sequences, sizeof(seq_ent) * m_NumSeqs);
+}
+
+CSequentialByteSequence::CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size), m_NumSeqs(seq.m_NumSeqs), m_Sequences(seq.m_Sequences) {
+    seq.m_Sequences = nullptr;
+}
+
+CSequentialByteSequence::~CSequentialByteSequence() {
+    delete m_Sequences;
+    m_Sequences = nullptr;
+}
+
+bool CSequentialByteSequence::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
+    while(size > 0) {
+        const seq_ent& seq_ent = get_sequence(this_off);
+
+        size_t sz = std::min(seq_ent.seq->size(), size);
+        if(!seq_ent.seq->compare(seq, this_off - seq_ent.off, seq_off, sz)) return false;
+
+        this_off += sz;
+        seq_off += sz;
+        size -= sz;
+    }
+    return true;
+}
+
+bool CSequentialByteSequence::compare(const uint8_t *buf, size_t off, size_t size) const {
+    while(size > 0) {
+        const seq_ent& seq_ent = get_sequence(off);
+
+        size_t sz = std::min(seq_ent.seq->size(), size);
+        if(!seq_ent.seq->compare(buf, off - seq_ent.off, sz)) return false;
+
+        buf += sz;
+        off += sz;
+        size -= sz;
+    }
+    return true;
+}
+
+void CSequentialByteSequence::get_data(uint8_t *buf, size_t off, size_t size) const {
+    while(size > 0) {
+        const seq_ent& seq_ent = get_sequence(off);
+
+        size_t sz = std::min(seq_ent.seq->size(), size);
+        seq_ent.seq->get_data(buf, off - seq_ent.off, sz);
+
+        buf += sz;
+        off += sz;
+        size -= sz;
+    }
+}
+
+const CSequentialByteSequence::seq_ent& CSequentialByteSequence::get_sequence(size_t off) const {
+    int s = 0, e = m_NumSeqs;
+    while(s < e-1) {
+        int m = s + (e-s) / 2;
+        if(off < m_Sequences[m].off) e = m;
+        else s = m;
+    }
+    return m_Sequences[s];
+}
+
 static uint8_t hex_lut[256] = { 0 };
 
 static inline void init_hex_lut() {
