@@ -3,6 +3,7 @@
 #include <tier1/tier1.h>
 #include <tier2/tier2.h>
 #include <engine/iserverplugin.h>
+#include <tier0/valve_minmax_off.h>
 #include "module.hpp"
 
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
@@ -16,7 +17,14 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
             ConnectTier1Libraries(&interfaceFactory, 1);
             ConnectTier2Libraries(&interfaceFactory, 1);
 
-            CModule engine_mod("engine"), matchmaking_mod("matchmaking"), server_mod("server");
+            try {
+                CModule engine_mod("engine"), matchmaking_mod("matchmaking"), server_mod("server");
+
+                CSequentialByteSequence seq STACK_SEQS(SEQ_STR("test"), SEQ_HEX("asdf"));
+            } catch(const std::exception& e) {
+                Warning("Exception while applying patches: %s\n", e.what());
+                return false;
+            }
 
             return true;
         }

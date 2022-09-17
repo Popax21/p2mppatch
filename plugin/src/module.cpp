@@ -11,6 +11,7 @@ struct check_mod_params {
     const char *name;
     void *base_addr;
     size_t size;
+    bool *page_flags;
 };
 
 static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
@@ -23,49 +24,48 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
     int targ_name_len = strlen(params->name);
     if(name_len < targ_name_len || strncmp(info->dlpi_name + name_len - targ_name_len, params->name, targ_name_len) != 0) return 0;
  
-    //Find code / RO data segment
-    uintptr_t start_addr = 0, end_addr = 0;
+    //Find end address
+    uintptr_t start_addr = info->dlpi_addr, end_addr = start_addr;
     for(int i = 0; i < info->dlpi_phnum; i++) {
-        //Check if the segment is writeable
-        if(info->dlpi_phdr[i].p_flags & PF_W) continue;
-
-        uintptr_t ph_start = info->dlpi_addr + info->dlpi_phdr[i].p_vaddr, ph_end = ph_start + info->dlpi_phdr[i].p_memsz;
-        if(end_addr < ph_end) end_addr = ph_end;
-
-        if(start_addr == end_addr) {
-            //Check if the segments are contiguous
-            if(start_addr == ph_end) start_addr = ph_start;
-            else if(end_addr == ph_start) end_addr = ph_end;
-            else Warning("Skipping module '%s' code / RO data segment %lx - %lx not contiguous with %lx-%lx\n", info->dlpi_name, ph_start, ph_end, start_addr, end_addr);
-        } else {
-            start_addr = ph_start;
-            end_addr = ph_end;
-        }
+        uintptr_t ph_end = info->dlpi_addr + info->dlpi_phdr[i].p_vaddr + info->dlpi_phdr[i].p_memsz;
+        if(ph_end > end_addr) end_addr = ph_end;
     }
 
-    if(start_addr == end_addr) {
-        Warning("Found matching module '%s' without code segment! Skipping...\n", info->dlpi_name);
-        return 0;
+    //Align page flags
+    start_addr -= (start_addr % PAGE_SIZE);
+    if(end_addr % PAGE_SIZE) end_addr += PAGE_SIZE - (end_addr % PAGE_SIZE);
+
+    //Create page flags
+    params->page_flags = new bool[(end_addr - start_addr) / PAGE_SIZE];
+    for(int i = 0; i < info->dlpi_phnum; i++) {
+        //Skip writeable segments
+        if(info->dlpi_phdr[i].p_flags & PF_W) continue;
+
+        //Set flags
+        uintptr_t ph_start = info->dlpi_addr + info->dlpi_phdr[i].p_vaddr, ph_end = ph_start + info->dlpi_phdr[i].p_memsz;
+        for(uintptr_t i = ph_start / PAGE_SIZE; i*PAGE_SIZE < ph_end; i++) params->page_flags[i - start_addr / PAGE_SIZE] = true;
     }
 
     params->base_addr = (void*) start_addr;
     params->size = (size_t) (end_addr - start_addr);
 
-    DevMsg("Found module '%s' matching target name '%s' at addr %lx: code/RO data %lx - %lx\n", info->dlpi_name, params->name, info->dlpi_addr, start_addr, end_addr);
+    DevMsg("Found module '%s' matching target name '%s' at addr %lx - %lx\n", info->dlpi_name, params->name, start_addr, end_addr);
     return 0;
 }
 
-static bool find_module(const char *name, void **base_addr, size_t *size) {
+static bool find_module(const char *name, void **base_addr, size_t *size, bool **page_flags) {
     struct check_mod_params params;
     params.name = name;
     params.base_addr = NULL;
     params.size = 0;
+    params.page_flags = NULL;
 
     dl_iterate_phdr(check_mod, &params);
-
     if(!params.base_addr) return false;
+
     *base_addr = params.base_addr;
     *size = params.size;
+    *page_flags = params.page_flags;
     return true;
 }
 #else
@@ -74,12 +74,7 @@ static bool find_module(const char *name, void **base_addr, size_t *size) {
 
 CModule::CModule(const char *name) {
     //Find the module
-    if(!find_module(name, &m_BaseAddr, &m_Size)) throw std::runtime_error("Can't find module '" + std::string(name) + "'!");
-
-    //Align module to page boundaries
-    m_Size += ((uintptr_t) m_BaseAddr) % PAGE_SIZE;
-    m_BaseAddr = (void*) (((uintptr_t) m_BaseAddr) - ((uintptr_t) m_BaseAddr) % PAGE_SIZE);
-    if(m_Size % PAGE_SIZE) m_Size += PAGE_SIZE - (m_Size % PAGE_SIZE);
+    if(!find_module(name, &m_BaseAddr, &m_Size, &m_PageFlags)) throw std::runtime_error("Can't find module '" + std::string(name) + "'!");
 
     //Build suffix tree
     m_SufTree = new CSuffixTree(*this);
@@ -89,4 +84,49 @@ CModule::CModule(const char *name) {
 CModule::~CModule() {
     delete m_SufTree;
     m_SufTree = nullptr;
+}
+
+bool CModule::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
+    while(size > 0) {
+        size_t sz = std::min(size, PAGE_SIZE - (this_off % PAGE_SIZE));
+
+        if(m_PageFlags[this_off / PAGE_SIZE]) {
+            if(!seq.compare((uint8_t*) m_BaseAddr + this_off, seq_off, sz)) return false;
+        }
+
+        this_off += sz;
+        seq_off += sz;
+        size -= sz;
+    }
+
+    return true;
+}
+
+bool CModule::compare(const uint8_t *buf, size_t off, size_t size) const {
+    while(size > 0) {
+        size_t sz = std::min(size, PAGE_SIZE - (off % PAGE_SIZE));
+
+        if(m_PageFlags[off / PAGE_SIZE]) {
+            if(!memcmp((uint8_t*) m_BaseAddr + off, buf, sz)) return false;
+        }
+
+        buf += sz;
+        off += sz;
+        size -= sz;
+    }
+
+    return true;
+}
+
+void CModule::get_data(uint8_t *buf, size_t off, size_t size) const {
+    while(size > 0) {
+        size_t sz = std::min(size, PAGE_SIZE - (off % PAGE_SIZE));
+
+        if(m_PageFlags[off / PAGE_SIZE]) memcpy((uint8_t*) m_BaseAddr + off, buf, sz);
+        else memset(buf, 0, sz);
+
+        buf += sz;
+        off += sz;
+        size -= sz;
+    }
 }

@@ -1,17 +1,12 @@
 #include <stdexcept>
 #include "byteseq.hpp"
 
-CSequentialByteSequence::CSequentialByteSequence(std::initializer_list<const IByteSequence*> seqs) : m_Size(0), m_NumSeqs(0) {
+CSequentialByteSequence::CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs, std::function<void(IByteSequence*)> deleter) : m_Size(0), m_NumSeqs(0) {
     m_Sequences = new seq_ent[seqs.size()];
-    for(const IByteSequence *seq : seqs) {
-        m_Sequences[m_NumSeqs++] = seq_ent(m_Size, seq);
+    for(IByteSequence *seq : seqs) {
+        m_Sequences[m_NumSeqs++] = seq_ent(m_Size, std::unique_ptr<IByteSequence, std::function<void(IByteSequence*)>>(seq, deleter));
         m_Size += seq->size();
     }
-}
-
-CSequentialByteSequence::CSequentialByteSequence(const CSequentialByteSequence &seq) : m_Size(seq.m_Size), m_NumSeqs(seq.m_NumSeqs) {
-    m_Sequences = new seq_ent[m_NumSeqs];
-    memcpy(m_Sequences, seq.m_Sequences, sizeof(seq_ent) * m_NumSeqs);
 }
 
 CSequentialByteSequence::CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size), m_NumSeqs(seq.m_NumSeqs), m_Sequences(seq.m_Sequences) {
@@ -19,8 +14,15 @@ CSequentialByteSequence::CSequentialByteSequence(CSequentialByteSequence &seq) :
 }
 
 CSequentialByteSequence::~CSequentialByteSequence() {
-    delete m_Sequences;
+    delete[] m_Sequences;
     m_Sequences = nullptr;
+}
+
+bool CSequentialByteSequence::set_anchor(SAnchor anchor) {
+    for(int i = 0; i < m_NumSeqs; i++) {
+        const seq_ent& ent = m_Sequences[i];
+        ent.seq->set_anchor(anchor + ent.off);
+    }
 }
 
 bool CSequentialByteSequence::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
@@ -107,6 +109,6 @@ CHexSequence::CHexSequence(const CHexSequence &seq) {
 }
 
 CHexSequence::~CHexSequence() {
-    delete m_Data;
+    delete[] m_Data;
     m_Data = nullptr;
 }

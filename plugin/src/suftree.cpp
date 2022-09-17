@@ -89,7 +89,7 @@ CSuffixTree::~CSuffixTree() {
     for(int i = 0; i < NUM_ORDERS; i++) {
         //Free pages
         for(npool_page *p = m_NodePoolPages[i], *np = p ? p->next_page : nullptr; p; p = np, np = p ? p->next_page : nullptr) {
-            delete p;
+            delete[] (uint8_t*) p;
         }
 
         m_NodePoolPages[i] = nullptr;

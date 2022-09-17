@@ -11,14 +11,23 @@ class CModule : public IByteSequence {
         CModule(const char *name);
         ~CModule();
 
+        virtual void *base_addr() const { return m_BaseAddr; }
         virtual size_t size() const { return m_Size; };
-        virtual const uint8_t *buffer() const { return (uint8_t*) m_BaseAddr; };
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memcpy(buf, (uint8_t*) m_BaseAddr + off, size); }
-        virtual uint8_t operator [](size_t off) const { return ((uint8_t*) m_BaseAddr)[off]; }
+
+        virtual bool compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
+        virtual bool compare(const uint8_t *buf, size_t off, size_t size) const;
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const;
+
+        virtual uint8_t operator [](size_t off) const {
+            if(!m_PageFlags[off / PAGE_SIZE]) return 0;
+            return ((uint8_t*) m_BaseAddr)[off];
+        }
 
     private:
         void *m_BaseAddr;
         size_t m_Size;
+        bool *m_PageFlags;
+
         CSuffixTree *m_SufTree;
 };
 

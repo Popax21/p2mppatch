@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <initializer_list>
+#include <memory>
+#include <functional>
+#include "anchor.hpp"
 
 class CSequentialByteSequence;
 
@@ -11,6 +14,8 @@ class IByteSequence {
     public:
         virtual size_t size() const = 0;
         virtual const uint8_t *buffer() const { return nullptr; }
+
+        virtual bool set_anchor(SAnchor anchor) { return true; }
 
         virtual bool compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
             const uint8_t *this_buf = buffer(), *seq_buf = seq.buffer();
@@ -40,12 +45,13 @@ class IByteSequence {
 
 class CSequentialByteSequence : public IByteSequence {
     public:
-        CSequentialByteSequence(std::initializer_list<const IByteSequence*> seqs);
-        CSequentialByteSequence(const CSequentialByteSequence &seq);
+        CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs, std::function<void(IByteSequence*)> deleter = noop_delete);
         CSequentialByteSequence(CSequentialByteSequence &seq);
         ~CSequentialByteSequence();
 
         virtual size_t size() const { return m_Size; };
+
+        virtual bool set_anchor(SAnchor anchor);
 
         virtual bool compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
         virtual bool compare(const uint8_t *buf, size_t off, size_t size) const;
@@ -57,12 +63,14 @@ class CSequentialByteSequence : public IByteSequence {
         }
 
     private:
+        static void noop_delete(IByteSequence*) {}
+
         struct seq_ent {
             size_t off;
-            const IByteSequence *seq;
+            std::unique_ptr<IByteSequence, std::function<void(IByteSequence*)>> seq;
 
-            inline seq_ent() {}
-            inline seq_ent(size_t off, const IByteSequence *seq) : off(off), seq(seq) {}
+            seq_ent() : seq(nullptr, noop_delete) {}
+            inline seq_ent(size_t off, std::unique_ptr<IByteSequence, std::function<void(IByteSequence*)>> seq) : off(off), seq(std::move(seq)) {}
         };
 
         const seq_ent& get_sequence(size_t off) const;
@@ -101,5 +109,11 @@ class CStringSequence : public IByteSequence {
         const char *m_String;
         size_t m_Size;
 };
+
+static void __stack_seq_deleter(IByteSequence *seq) { seq->~IByteSequence(); }
+#define STACK_SEQS(...) ({ __VA_ARGS__ }, __stack_seq_deleter)
+#define SEQ_SEQ(...) new (alloca(sizeof(CSequentialByteSequence))) CSequentialByteSequence({ __VA_ARGS__ }, __stack_seq_deleter)
+#define SEQ_HEX(str) new (alloca(sizeof(CHexSequence))) CHexSequence(str)
+#define SEQ_STR(str) new (alloca(sizeof(CStringSequence))) CStringSequence(str)
 
 #endif
