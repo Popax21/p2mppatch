@@ -5,6 +5,7 @@
 #include <string.h>
 #include <initializer_list>
 #include <memory>
+#include <stdexcept>
 #include <functional>
 #include "anchor.hpp"
 
@@ -80,6 +81,20 @@ class CSequentialByteSequence : public IByteSequence {
         seq_ent *m_Sequences;
 };
 
+class CArraySequence : public IByteSequence {
+    public:
+        CArraySequence(const uint8_t *data, size_t size) : m_Data(data), m_Size(size) {}
+
+        virtual size_t size() const { return m_Size; };
+        virtual const uint8_t *buffer() const { return m_Data; };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memcpy(buf, m_Data+off, size); }
+        virtual uint8_t operator [](size_t off) const { return m_Data[off]; }
+
+    private:
+        const uint8_t *m_Data;
+        size_t m_Size;
+};
+
 class CHexSequence : public IByteSequence {
     public:
         CHexSequence(const char *hexstr);
@@ -92,8 +107,8 @@ class CHexSequence : public IByteSequence {
         virtual uint8_t operator [](size_t off) const { return m_Data[off]; }
 
     private:
-        size_t m_Size;
         uint8_t *m_Data;
+        size_t m_Size;
 };
 
 class CStringSequence : public IByteSequence {
@@ -110,10 +125,52 @@ class CStringSequence : public IByteSequence {
         size_t m_Size;
 };
 
+class CRefInstructionSequence : public IByteSequence {
+    public:
+        CRefInstructionSequence(const IByteSequence& opcode, SAnchor anchor) : m_Opcode(opcode), m_RefAnchor(anchor), m_IsAnchored(false) {}
+
+        virtual size_t size() const { return m_Opcode.size() + sizeof(size_t); };
+
+        virtual bool set_anchor(SAnchor anchor) {
+            m_InstrAnchor = anchor;
+            return true;
+        }
+
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const {
+            while(size-- > 0) *(buf++) = (*this)[off++];
+        }
+
+        virtual uint8_t operator [](size_t off) const {
+            if(!m_IsAnchored) throw std::runtime_error("Can't access content of CRefInstructionSequence when not anchored");
+            if(off < m_Opcode.size()) return m_Opcode[off];
+
+            size_t rel = m_RefAnchor + size() - m_InstrAnchor;
+            return ((uint8_t*) &rel)[off-1];
+        }
+
+    private:
+        const IByteSequence& m_Opcode;
+        SAnchor m_RefAnchor;
+
+        bool m_IsAnchored;
+        SAnchor m_InstrAnchor;
+};
+
 static void __stack_seq_deleter(IByteSequence *seq) { seq->~IByteSequence(); }
 #define STACK_SEQS(...) ({ __VA_ARGS__ }, __stack_seq_deleter)
-#define SEQ_SEQ(...) new (alloca(sizeof(CSequentialByteSequence))) CSequentialByteSequence({ __VA_ARGS__ }, __stack_seq_deleter)
-#define SEQ_HEX(str) new (alloca(sizeof(CHexSequence))) CHexSequence(str)
-#define SEQ_STR(str) new (alloca(sizeof(CStringSequence))) CStringSequence(str)
+#define NEW_STACK_SEQ(type) new (alloca(sizeof(type))) type
+
+#define SEQ_SEQ(...) NEW_STACK_SEQ(CSequentialByteSequence)({ __VA_ARGS__ }, __stack_seq_deleter)
+#define SEQ_HEX(str) NEW_STACK_SEQ(CHexSequence)(str)
+#define SEQ_STR(str) NEW_STACK_SEQ(CStringSequence)(str)
+#define SEQ_JMP(ref) NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0xe9 }, 1), ref)
+#define SEQ_JZ(ref)  NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x84 }, 2), ref)
+#define SEQ_JNZ(ref) NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x85 }, 2), ref)
+#define SEQ_JL(ref)  NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x8c }, 2), ref)
+#define SEQ_JNL(ref) NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x8d }, 2), ref)
+#define SEQ_JG(ref)  NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x8f }, 2), ref)
+#define SEQ_JNG(ref) NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x8e }, 2), ref)
+#define SEQ_JLE(ref) SEQ_JNG(ref)
+#define SEQ_JGE(ref) SEQ_JNL(ref)
 
 #endif

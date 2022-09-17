@@ -21,8 +21,9 @@ CSequentialByteSequence::~CSequentialByteSequence() {
 bool CSequentialByteSequence::set_anchor(SAnchor anchor) {
     for(int i = 0; i < m_NumSeqs; i++) {
         const seq_ent& ent = m_Sequences[i];
-        ent.seq->set_anchor(anchor + ent.off);
+        if(!ent.seq->set_anchor(anchor + ent.off)) return false;
     }
+    return true;
 }
 
 bool CSequentialByteSequence::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
