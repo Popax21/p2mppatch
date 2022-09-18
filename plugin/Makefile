@@ -3,7 +3,7 @@ SDK ?= $(realpath ../sdk)
 
 all: $(PLUGIN)
 
-SRC := plugin.cpp byteseq.cpp module.cpp anchor.cpp suftree.cpp
+SRC := plugin.cpp byteseq.cpp module.cpp anchor.cpp suftree.cpp patch.cpp
 SRC := $(addprefix src/, $(SRC))
 OBJ := $(addprefix obj/, $(SRC:.cpp=.o))
 

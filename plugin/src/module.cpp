@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <system_error>
 #include <tier0/dbg.h>
 #include "module.hpp"
 
@@ -6,12 +7,13 @@ static bool find_module(const char *name, void **base_addr, size_t *size);
 
 #ifdef LINUX
 #include <link.h>
+#include <sys/mman.h>
 
 struct check_mod_params {
     const char *name;
     void *base_addr;
     size_t size;
-    bool *page_flags;
+    uint8_t *page_flags;
 };
 
 static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
@@ -36,14 +38,18 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
     if(end_addr % PAGE_SIZE) end_addr += PAGE_SIZE - (end_addr % PAGE_SIZE);
 
     //Create page flags
-    params->page_flags = new bool[(end_addr - start_addr) / PAGE_SIZE];
-    for(int i = 0; i < info->dlpi_phnum; i++) {
-        //Skip writeable segments
-        if(info->dlpi_phdr[i].p_flags & PF_W) continue;
+    size_t num_pages = (end_addr - start_addr) / PAGE_SIZE;
+    params->page_flags = new uint8_t[num_pages];
+    std::fill_n(params->page_flags, num_pages, 0);
 
-        //Set flags
+    for(int i = 0; i < info->dlpi_phnum; i++) {
+        Elf32_Word pflags = info->dlpi_phdr[i].p_flags;
+        uint8_t flags = (uint8_t) CModule::page_flag::PAGE_R;
+        if(pflags & PF_W) flags |= (uint8_t) CModule::page_flag::PAGE_W;
+        if(pflags & PF_X) flags |= (uint8_t) CModule::page_flag::PAGE_X;
+
         uintptr_t ph_start = info->dlpi_addr + info->dlpi_phdr[i].p_vaddr, ph_end = ph_start + info->dlpi_phdr[i].p_memsz;
-        for(uintptr_t i = ph_start / PAGE_SIZE; i*PAGE_SIZE < ph_end; i++) params->page_flags[i - start_addr / PAGE_SIZE] = true;
+        for(uintptr_t i = ph_start / PAGE_SIZE; i*PAGE_SIZE < ph_end; i++) params->page_flags[i - start_addr / PAGE_SIZE] = flags;
     }
 
     params->base_addr = (void*) start_addr;
@@ -53,7 +59,7 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
     return 0;
 }
 
-static bool find_module(const char *name, void **base_addr, size_t *size, bool **page_flags) {
+static bool find_module(const char *name, void **base_addr, size_t *size, uint8_t **page_flags) {
     struct check_mod_params params;
     params.name = name;
     params.base_addr = NULL;
@@ -68,11 +74,22 @@ static bool find_module(const char *name, void **base_addr, size_t *size, bool *
     *page_flags = params.page_flags;
     return true;
 }
+
+static void apply_page_flags(void *page, uint8_t flags) {
+    int prot = 0;
+    if(flags & (int) CModule::page_flag::PAGE_R) prot |= PROT_READ;
+    if(flags & (int) CModule::page_flag::PAGE_W) prot |= PROT_WRITE;
+    if(flags & (int) CModule::page_flag::PAGE_X) prot |= PROT_EXEC;
+    if(mprotect(page, PAGE_SIZE, prot) < 0) {
+        throw std::system_error(errno, std::system_category());
+    }
+}
+
 #else
 #error Implement me!
 #endif
 
-CModule::CModule(const char *name) {
+CModule::CModule(const char *name) : m_Name(name) {
     //Find the module
     if(!find_module(name, &m_BaseAddr, &m_Size, &m_PageFlags)) throw std::runtime_error("Can't find module '" + std::string(name) + "'!");
 
@@ -90,7 +107,7 @@ bool CModule::compare(const IByteSequence &seq, size_t this_off, size_t seq_off,
     while(size > 0) {
         size_t sz = std::min(size, PAGE_SIZE - (this_off % PAGE_SIZE));
 
-        if(m_PageFlags[this_off / PAGE_SIZE]) {
+        if(m_PageFlags[this_off / PAGE_SIZE] & (int) page_flag::PAGE_R) {
             if(!seq.compare((uint8_t*) m_BaseAddr + this_off, seq_off, sz)) return false;
         }
 
@@ -106,7 +123,7 @@ bool CModule::compare(const uint8_t *buf, size_t off, size_t size) const {
     while(size > 0) {
         size_t sz = std::min(size, PAGE_SIZE - (off % PAGE_SIZE));
 
-        if(m_PageFlags[off / PAGE_SIZE]) {
+        if(m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R) {
             if(!memcmp((uint8_t*) m_BaseAddr + off, buf, sz)) return false;
         }
 
@@ -122,11 +139,51 @@ void CModule::get_data(uint8_t *buf, size_t off, size_t size) const {
     while(size > 0) {
         size_t sz = std::min(size, PAGE_SIZE - (off % PAGE_SIZE));
 
-        if(m_PageFlags[off / PAGE_SIZE]) memcpy((uint8_t*) m_BaseAddr + off, buf, sz);
+        if(m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R) memcpy((uint8_t*) m_BaseAddr + off, buf, sz);
         else memset(buf, 0, sz);
 
         buf += sz;
         off += sz;
         size -= sz;
     }
+}
+
+SAnchor CModule::find_seq_anchor(const IByteSequence &seq) const {
+    size_t off;
+    if(!m_SufTree->find_needle(seq, &off)) throw std::runtime_error("Can't find sequence needle in module");
+
+    DevMsg("Found sequence anchor for sequence '");
+    for(size_t i = 0; i < seq.size(); i++) DevMsg("%02x", seq[i]);
+    DevMsg("' [%d bytes] in module '%s' at offset 0x%llx\n", seq.size(), m_Name, off);
+
+    return SAnchor(this, off); 
+}
+
+void CModule::unprotect() {
+    size_t num_unprot = 0;
+    for(size_t i = 0; i*PAGE_SIZE < m_Size; i++) {
+        //Check if the page is readable, but isn't writeable
+        if(!(m_PageFlags[i] & (int) page_flag::PAGE_R)) continue;
+        if((m_PageFlags[i] & (int) page_flag::PAGE_W) || (m_PageFlags[i] & (int) page_flag::PAGE_UNPROT)) continue;
+
+        //Make the page writeable
+        apply_page_flags((uint8_t*) m_BaseAddr + i*PAGE_SIZE, m_PageFlags[i] | (uint8_t) page_flag::PAGE_W);
+        m_PageFlags[i] |= (uint8_t) page_flag::PAGE_UNPROT;
+        num_unprot++;
+    }
+    DevMsg("Unprotected 0x%x pages in module '%s'\n", num_unprot, m_Name);
+}
+
+void CModule::reprotect() {
+    size_t num_reprot = 0;
+    for(size_t i = 0; i*PAGE_SIZE < m_Size; i++) {
+        //Check if the page has been unprotected
+        if(!(m_PageFlags[i] & (int) page_flag::PAGE_UNPROT)) continue;
+
+        //Re-apply the old page flags 
+        m_PageFlags[i] &= ~(uint8_t) page_flag::PAGE_UNPROT;
+        apply_page_flags((uint8_t*) m_BaseAddr + i*PAGE_SIZE, m_PageFlags[i]);
+        num_reprot++;
+    }
+    DevMsg("Reprotected 0x%x pages in module '%s'\n", num_reprot, m_Name);
 }
