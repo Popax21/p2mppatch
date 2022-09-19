@@ -92,7 +92,10 @@ static inline void init_hex_lut() {
 }
 
 CHexSequence::CHexSequence(const char *hexstr) {
-    int len = strlen(hexstr);
+    size_t len = 0;
+    for(const char *p = hexstr; *p; p++) {
+        if(!isspace(*p)) len++;
+    }
     if(len % 2 != 0) throw std::invalid_argument("Invalid hex string!");
 
     m_Size = len / 2;
@@ -100,6 +103,7 @@ CHexSequence::CHexSequence(const char *hexstr) {
 
     init_hex_lut();
     for(size_t i = 0; i < m_Size; i++) {
+        if(isspace(hexstr[i])) continue;
         m_Data[i] = (hex_lut[hexstr[2*i]] << 4) | hex_lut[hexstr[2*i+1]];
     }
 }
