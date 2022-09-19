@@ -9,10 +9,16 @@
 
 class CMPPatchPlugin : public IServerPluginCallbacks {
     public:
+        static const int MAX_PLAYERS = 0x20;
+
         void update_patches();
 
+        const CModule& engine_module() const { return *m_EngineModule; }
+        const CModule& matchmaking_module() const { return *m_MatchMakingModule; }
+        const CModule& server_module() const { return *m_ServerModule; }
+
         template<typename T, typename... Args> void register_patch(Args... args) {
-            m_Patches.push_back(std::unique_ptr<T>(new T(args...)));
+            m_Patches.emplace_back(new T(args...));
         }
 
         //Server callbacks
@@ -42,6 +48,7 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
 
     private:
         CModule *m_EngineModule, *m_MatchMakingModule, *m_ServerModule;
+        std::vector<std::unique_ptr<IPatchRegistrar>> m_PatchRegistrars;
         std::vector<std::unique_ptr<CPatch>> m_Patches;
 };
 

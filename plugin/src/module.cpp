@@ -44,7 +44,8 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
 
     for(int i = 0; i < info->dlpi_phnum; i++) {
         Elf32_Word pflags = info->dlpi_phdr[i].p_flags;
-        uint8_t flags = (uint8_t) CModule::page_flag::PAGE_R;
+        uint8_t flags = 0;
+        if(pflags & PF_R) flags |= (uint8_t) CModule::page_flag::PAGE_R;
         if(pflags & PF_W) flags |= (uint8_t) CModule::page_flag::PAGE_W;
         if(pflags & PF_X) flags |= (uint8_t) CModule::page_flag::PAGE_X;
 
@@ -109,6 +110,10 @@ bool CModule::compare(const IByteSequence &seq, size_t this_off, size_t seq_off,
 
         if(m_PageFlags[this_off / PAGE_SIZE] & (int) page_flag::PAGE_R) {
             if(!seq.compare((uint8_t*) m_BaseAddr + this_off, seq_off, sz)) return false;
+        } else {
+            for(size_t o = 0; o < sz; o++) {
+                if(seq[seq_off + o] != 0) return false;
+            }
         }
 
         this_off += sz;
@@ -125,6 +130,10 @@ bool CModule::compare(const uint8_t *buf, size_t off, size_t size) const {
 
         if(m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R) {
             if(!memcmp((uint8_t*) m_BaseAddr + off, buf, sz)) return false;
+        } else {
+            for(const uint8_t *p = buf; sz > 0; p++, sz--) {
+                if(*p != 0) return false;
+            }
         }
 
         buf += sz;
@@ -150,7 +159,7 @@ void CModule::get_data(uint8_t *buf, size_t off, size_t size) const {
 
 SAnchor CModule::find_seq_anchor(const IByteSequence &seq) const {
     size_t off;
-    if(!m_SufTree->find_needle(seq, &off)) throw std::runtime_error("Can't find sequence needle in module");
+    if(!m_SufTree->find_needle(seq, &off)) throw std::runtime_error("Can't find sequence needle [" + std::to_string(seq.size()) + " bytes] in module");
 
     DevMsg("Found sequence anchor for sequence '");
     for(size_t i = 0; i < seq.size(); i++) DevMsg("%02x", seq[i]);

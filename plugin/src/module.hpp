@@ -30,7 +30,7 @@ class CModule : public IByteSequence {
         virtual void reprotect();
 
         virtual uint8_t operator [](size_t off) const {
-            if((m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R) == 0) return 0;
+            if(!(m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R)) return 0;
             return ((uint8_t*) m_BaseAddr)[off];
         }
 

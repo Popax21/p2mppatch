@@ -14,7 +14,7 @@ SDKSTATLIB := tier1.a mathlib.a tier2.a
 SDKSTATLIB := $(addprefix $(SDK)/mp/src/lib/public/linux32/, $(SDKSTATLIB))
 
 CPPFLAGS := -O0 -g3 -m32 -std=gnu++0x -march=core2 -mtune=core2 -msse2 -mfpmath=sse -fpermissive -DNO_HOOK_MALLOC -DNO_MALLOC_OVERRIDE -DGNUC -DCOMPILER_GCC -DPOSIX -D_POSIX -DLINUX -D_LINUX -DDLLNAME=p2mppatch
-CFLAGAS := $(CPPFLAGS) -I"$(SDK)/mp/src/public" -I"$(SDK)/mp/src/public/tier0" -I"$(SDK)/mp/src/public/tier1" -I"$(COMPILER)/include/c++/4.6.3"
+CFLAGAS := $(CPPFLAGS) -I"src" -I"$(SDK)/mp/src/public" -I"$(SDK)/mp/src/public/tier0" -I"$(SDK)/mp/src/public/tier1" -I"$(COMPILER)/include/c++/4.6.3"
 LFLAGS := $(CPPFLAGS) -shared -Wl,--no-undefined -L"$(SDK)/mp/src/lib/public/linux32" -u _CreateInterface -lm -ldl -lpthread
 
 -include $(OBJ:.o=.d)

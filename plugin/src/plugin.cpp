@@ -9,6 +9,8 @@
 #include "module.hpp"
 #include "patch.hpp"
 
+#include "patches/player_count.h"
+
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
     return localtime_r(timep, result);
 }
@@ -26,9 +28,11 @@ void CMPPatchPlugin::update_patches() {
         m_Patches.clear();
     }
 
-    //Prepare patches
-    Msg("Preparing patches...\n");
-
+    //Register patches
+    for(const std::unique_ptr<IPatchRegistrar>& reg : m_PatchRegistrars) {
+        Msg("Registering patches for registrar '%s'...\n", reg->name());
+        reg->register_patches(*this);
+    }
 
     //Apply patches
     Msg("Applying patches...\n");
@@ -52,6 +56,10 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
         m_EngineModule = new CModule("engine");
         m_MatchMakingModule = new CModule("matchmaking");
         m_ServerModule = new CModule("server");
+
+        //Prearing registrars
+        Msg("Preparing registrars...\n");
+        m_PatchRegistrars.emplace_back(new patches::CPlayerCountPatch(MAX_PLAYERS));
 
         //Apply patches
         update_patches();
@@ -78,6 +86,10 @@ void CMPPatchPlugin::Unload() {
         m_EngineModule->reprotect();
         m_MatchMakingModule->reprotect();
         m_ServerModule->reprotect();
+
+        //Delete registrars
+        Msg("Deleting registrars...\n");
+        m_PatchRegistrars.clear();
 
         //Delete modules
         Msg("Deleting modules...\n");
