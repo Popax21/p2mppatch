@@ -1,10 +1,10 @@
 #include <stdexcept>
 #include "byteseq.hpp"
 
-CSequentialByteSequence::CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs, std::function<void(IByteSequence*)> deleter) : m_Size(0), m_NumSeqs(0) {
+CSequentialByteSequence::CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs) : m_Size(0), m_NumSeqs(0) {
     m_Sequences = new seq_ent[seqs.size()];
     for(IByteSequence *seq : seqs) {
-        m_Sequences[m_NumSeqs++] = seq_ent(m_Size, std::unique_ptr<IByteSequence, std::function<void(IByteSequence*)>>(seq, deleter));
+        m_Sequences[m_NumSeqs++] = seq_ent(m_Size, seq);
         m_Size += seq->size();
     }
 }
@@ -26,32 +26,34 @@ bool CSequentialByteSequence::set_anchor(SAnchor anchor) {
     return true;
 }
 
-bool CSequentialByteSequence::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
+int CSequentialByteSequence::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
     while(size > 0) {
         const seq_ent& seq_ent = get_sequence(this_off);
 
         size_t sz = std::min(seq_ent.seq->size(), size);
-        if(!seq_ent.seq->compare(seq, this_off - seq_ent.off, seq_off, sz)) return false;
+        int r = seq_ent.seq->compare(seq, this_off - seq_ent.off, seq_off, sz);
+        if(r != 0) return r;
 
         this_off += sz;
         seq_off += sz;
         size -= sz;
     }
-    return true;
+    return 0;
 }
 
-bool CSequentialByteSequence::compare(const uint8_t *buf, size_t off, size_t size) const {
+int CSequentialByteSequence::compare(const uint8_t *buf, size_t off, size_t size) const {
     while(size > 0) {
         const seq_ent& seq_ent = get_sequence(off);
 
         size_t sz = std::min(seq_ent.seq->size(), size);
-        if(!seq_ent.seq->compare(buf, off - seq_ent.off, sz)) return false;
+        int r = seq_ent.seq->compare(buf, off - seq_ent.off, sz);
+        if(r != 0) return r;
 
         buf += sz;
         off += sz;
         size -= sz;
     }
-    return true;
+    return 0;
 }
 
 void CSequentialByteSequence::get_data(uint8_t *buf, size_t off, size_t size) const {
@@ -102,9 +104,11 @@ CHexSequence::CHexSequence(const char *hexstr) {
     m_Data = new uint8_t[m_Size];
 
     init_hex_lut();
-    for(size_t i = 0; i < m_Size; i++) {
-        if(isspace(hexstr[i])) continue;
-        m_Data[i] = (hex_lut[hexstr[2*i]] << 4) | hex_lut[hexstr[2*i+1]];
+    size_t idx = 0;
+    for(const char *p = hexstr; *p; p++) {
+        if(isspace(*p)) continue;
+        m_Data[idx++] = (hex_lut[*p] << 4) | hex_lut[*(p+1)];
+        p++;
     }
 }
 

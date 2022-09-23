@@ -18,26 +18,26 @@ class IByteSequence {
 
         virtual bool set_anchor(SAnchor anchor) { return true; }
 
-        virtual bool compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
             const uint8_t *this_buf = buffer(), *seq_buf = seq.buffer();
-            if( this_buf &&  seq_buf) return memcmp(this_buf + this_off, seq_buf + seq_off, size) == 0;
-            if( this_buf && !seq_buf) return seq.compare(this_buf + this_off, seq_off, size);
+            if( this_buf &&  seq_buf) return memcmp(this_buf + this_off, seq_buf + seq_off, size);
+            if( this_buf && !seq_buf) return -seq.compare(this_buf + this_off, seq_off, size);
             if(!this_buf &&  seq_buf) return compare(seq_buf + seq_off, this_off, size);
 
             for(size_t i = 0; i < size; i++) {
-                if((*this)[this_off + i] != seq[seq_off + i]) return false;
+                if((*this)[this_off + i] != seq[seq_off + i]) return ((*this)[this_off + i] < seq[seq_off + i]) ? -1 : 1;
             }
-            return true;
+            return 0;
         }
 
-        virtual bool compare(const uint8_t *buf, size_t off, size_t size) const {
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const {
             const uint8_t *this_buf = buffer();
             if(this_buf) return memcmp(this_buf + off, buf, size) == 0;
 
             for(size_t i = 0; i < size; i++) {
-                if((*this)[off + i] != buf[i]) return false;
+                if((*this)[off + i] != buf[i]) return ((*this)[off + i] < buf[i]) ? -1 : 1;
             }
-            return true;
+            return 0;
         }
 
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const = 0;
@@ -46,7 +46,7 @@ class IByteSequence {
 
 class CSequentialByteSequence : public IByteSequence {
     public:
-        CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs, std::function<void(IByteSequence*)> deleter = noop_delete);
+        CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs);
         CSequentialByteSequence(CSequentialByteSequence &seq);
         ~CSequentialByteSequence();
 
@@ -54,8 +54,8 @@ class CSequentialByteSequence : public IByteSequence {
 
         virtual bool set_anchor(SAnchor anchor);
 
-        virtual bool compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
-        virtual bool compare(const uint8_t *buf, size_t off, size_t size) const;
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const;
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const;
 
         inline virtual uint8_t operator [](size_t off) const {
@@ -64,14 +64,12 @@ class CSequentialByteSequence : public IByteSequence {
         }
 
     private:
-        static void noop_delete(IByteSequence*) {}
-
         struct seq_ent {
             size_t off;
-            std::unique_ptr<IByteSequence, std::function<void(IByteSequence*)>> seq;
+            IByteSequence* seq;
 
-            seq_ent() : seq(nullptr, noop_delete) {}
-            inline seq_ent(size_t off, std::unique_ptr<IByteSequence, std::function<void(IByteSequence*)>> seq) : off(off), seq(std::move(seq)) {}
+            inline seq_ent() : off(0), seq(nullptr) {}
+            inline seq_ent(size_t off, IByteSequence* seq) : off(off), seq(seq) {}
         };
 
         const seq_ent& get_sequence(size_t off) const;
@@ -156,20 +154,16 @@ class CRefInstructionSequence : public IByteSequence {
         SAnchor m_InstrAnchor;
 };
 
-static void __stack_seq_deleter(IByteSequence *seq) { seq->~IByteSequence(); }
-#define STACK_SEQS(...) ({ __VA_ARGS__ }, __stack_seq_deleter)
-#define NEW_STACK_SEQ(type) new (alloca(sizeof(type))) type
-
-#define SEQ_SEQ(...) NEW_STACK_SEQ(CSequentialByteSequence)({ __VA_ARGS__ }, __stack_seq_deleter)
-#define SEQ_HEX(str) NEW_STACK_SEQ(CHexSequence)(str)
-#define SEQ_STR(str) NEW_STACK_SEQ(CStringSequence)(str)
-#define SEQ_JMP(ref) NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0xe9 }, 1), ref)
-#define SEQ_JZ(ref)  NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x84 }, 2), ref)
-#define SEQ_JNZ(ref) NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x85 }, 2), ref)
-#define SEQ_JL(ref)  NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x8c }, 2), ref)
-#define SEQ_JNL(ref) NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x8d }, 2), ref)
-#define SEQ_JG(ref)  NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x8f }, 2), ref)
-#define SEQ_JNG(ref) NEW_STACK_SEQ(CRefInstructionSequence)(*NEW_STACK_SEQ(CArraySequence)((const uint8_t[]) { 0x0f, 0x8e }, 2), ref)
+#define SEQ_SEQ(...) CSequentialByteSequence({ __VA_ARGS__ })
+#define SEQ_HEX(str) CHexSequence(str)
+#define SEQ_STR(str) CStringSequence(str)
+#define SEQ_JMP(ref) CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0xe9 }, 1), ref)
+#define SEQ_JZ(ref)  CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x84 }, 2), ref)
+#define SEQ_JNZ(ref) CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x85 }, 2), ref)
+#define SEQ_JL(ref)  CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x8c }, 2), ref)
+#define SEQ_JNL(ref) CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x8d }, 2), ref)
+#define SEQ_JG(ref)  CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x8f }, 2), ref)
+#define SEQ_JNG(ref) CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x8e }, 2), ref)
 #define SEQ_JLE(ref) SEQ_JNG(ref)
 #define SEQ_JGE(ref) SEQ_JNL(ref)
 
