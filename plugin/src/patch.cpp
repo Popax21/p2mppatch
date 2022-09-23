@@ -18,7 +18,7 @@ void CPatch::apply() {
 
     //Check if the original sequence matches the target
     m_OrigSeq.set_anchor(m_PatchTarget);
-    if(!m_OrigSeq.compare((uint8_t*) m_PatchTarget.get_addr(), 0, m_OrigSeq.size())) throw new std::runtime_error("Original sequence of patch '" + std::string(m_PatchTarget.module->name()) + "':" + std::to_string(m_PatchTarget.offset) + "doesn't match target [" + std::to_string(m_OrigSeq.size()) + " bytes]");
+    if(m_OrigSeq.compare((uint8_t*) m_PatchTarget.get_addr(), 0, m_OrigSeq.size()) != 0) throw new std::runtime_error("Original sequence of patch '" + std::string(m_PatchTarget.module->name()) + "':" + std::to_string(m_PatchTarget.offset) + "doesn't match target [" + std::to_string(m_OrigSeq.size()) + " bytes]");
 
     //Anchor the new sequence and overwrite the target data
     m_NewSeq.set_anchor(m_PatchTarget);

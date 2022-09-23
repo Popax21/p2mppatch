@@ -2,13 +2,15 @@
 #define H_P2MPPATCH_MODULE
 
 #include "byteseq.hpp"
-#include "suftree.hpp"
+#include "sufarr.hpp"
 #include "anchor.hpp"
 
 #define PAGE_SIZE 0x1000
 
 class CModule : public IByteSequence {
     public:
+        static const int MAX_NEEDLE_SIZE = 32;
+
         enum class page_flag {
             PAGE_R = 1, PAGE_W = 2, PAGE_X = 4, PAGE_UNPROT = 8
         };
@@ -20,8 +22,8 @@ class CModule : public IByteSequence {
         virtual void *base_addr() const { return m_BaseAddr; }
         virtual size_t size() const { return m_Size; };
 
-        virtual bool compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
-        virtual bool compare(const uint8_t *buf, size_t off, size_t size) const;
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const;
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const;
 
         virtual SAnchor find_seq_anchor(const IByteSequence &seq) const;
@@ -40,7 +42,7 @@ class CModule : public IByteSequence {
         size_t m_Size;
 
         uint8_t *m_PageFlags;
-        CSuffixTree *m_SufTree;
+        CSuffixArray *m_SufArray;
 };
 
 #endif

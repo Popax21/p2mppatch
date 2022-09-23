@@ -94,25 +94,26 @@ CModule::CModule(const char *name) : m_Name(name) {
     //Find the module
     if(!find_module(name, &m_BaseAddr, &m_Size, &m_PageFlags)) throw std::runtime_error("Can't find module '" + std::string(name) + "'!");
 
-    //Build suffix tree
-    m_SufTree = new CSuffixTree(*this);
-    DevMsg("Constructed suffix tree for module '%s' [%d kB]\n", name, m_SufTree->get_mem_usage() / 1024);
+    //Build suffix array
+    m_SufArray = new CSuffixArray(*this, MAX_NEEDLE_SIZE);
+    DevMsg("Constructed suffix array for module '%s' [%d kB]\n", name, m_SufArray->get_mem_usage() / 1024);
 }
 
 CModule::~CModule() {
-    delete m_SufTree;
-    m_SufTree = nullptr;
+    delete m_SufArray;
+    m_SufArray = nullptr;
 }
 
-bool CModule::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
+int CModule::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
     while(size > 0) {
         size_t sz = std::min(size, PAGE_SIZE - (this_off % PAGE_SIZE));
 
         if(m_PageFlags[this_off / PAGE_SIZE] & (int) page_flag::PAGE_R) {
-            if(!seq.compare((uint8_t*) m_BaseAddr + this_off, seq_off, sz)) return false;
+            int r = seq.compare((uint8_t*) m_BaseAddr + this_off, seq_off, sz);
+            if(r != 0) return -r;
         } else {
             for(size_t o = 0; o < sz; o++) {
-                if(seq[seq_off + o] != 0) return false;
+                if(seq[seq_off + o] != 0) return 1;
             }
         }
 
@@ -121,18 +122,19 @@ bool CModule::compare(const IByteSequence &seq, size_t this_off, size_t seq_off,
         size -= sz;
     }
 
-    return true;
+    return 0;
 }
 
-bool CModule::compare(const uint8_t *buf, size_t off, size_t size) const {
+int CModule::compare(const uint8_t *buf, size_t off, size_t size) const {
     while(size > 0) {
         size_t sz = std::min(size, PAGE_SIZE - (off % PAGE_SIZE));
 
         if(m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R) {
-            if(!memcmp((uint8_t*) m_BaseAddr + off, buf, sz)) return false;
+            int r = memcmp((uint8_t*) m_BaseAddr + off, buf, sz);
+            if(r != 0) return r;
         } else {
             for(const uint8_t *p = buf; sz > 0; p++, sz--) {
-                if(*p != 0) return false;
+                if(*p != 0) return 1;
             }
         }
 
@@ -141,7 +143,7 @@ bool CModule::compare(const uint8_t *buf, size_t off, size_t size) const {
         size -= sz;
     }
 
-    return true;
+    return 0;
 }
 
 void CModule::get_data(uint8_t *buf, size_t off, size_t size) const {
@@ -159,7 +161,7 @@ void CModule::get_data(uint8_t *buf, size_t off, size_t size) const {
 
 SAnchor CModule::find_seq_anchor(const IByteSequence &seq) const {
     size_t off;
-    if(!m_SufTree->find_needle(seq, &off)) throw std::runtime_error("Can't find sequence needle [" + std::to_string(seq.size()) + " bytes] in module");
+    if(!m_SufArray->find_needle(seq, &off)) throw std::runtime_error("Can't find sequence needle [" + std::to_string(seq.size()) + " bytes] in module '" + std::string(m_Name) + "'");
 
     DevMsg("Found sequence anchor for sequence '");
     for(size_t i = 0; i < seq.size(); i++) DevMsg("%02x", seq[i]);
