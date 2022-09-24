@@ -19,38 +19,28 @@ CSuffixArray::~CSuffixArray() {
 
 bool CSuffixArray::find_needle(const IByteSequence& needle, size_t *off) const {
     const size_t needle_sz = needle.size();
-    DevMsg("nsz=%lu mnsz=%lu\n", needle_sz, m_MaxNeedleSize);
     if(needle_sz > m_MaxNeedleSize) return false;
 
     //Use binary search to find the suffix starting with the prefix
     size_t s = 0, e = m_Sequence.size();
     while(s < e-1) {
         size_t m = s + (e-s) / 2;
-        DevMsg("s=%lu e=%lu m=%lu c=%d ", s, e, m, needle.compare(m_Sequence, 0, m_SufOffsets[m], needle_sz));
-        for(int i = 0; i < needle_sz; i++) DevMsg("%02x", needle[i]);
-        DevMsg(" ");
-        for(int i = 0; i < needle_sz; i++) DevMsg("%02x", m_Sequence[m_SufOffsets[m] + i]);
-        DevMsg("\n");
         if(needle.compare(m_Sequence, 0, m_SufOffsets[m], needle_sz) <= 0) e = m;
         else s = m;
     }
-
 
     //Check if the suffix matches the needle
     size_t suf = s;
     if(suf > 0 || needle.compare(m_Sequence, 0, m_SufOffsets[suf], needle_sz) != 0) {
         suf++;
         if(suf >= m_Sequence.size()) return false;
-        DevMsg("chk %lx\n", m_SufOffsets[suf]);
         if(needle.compare(m_Sequence, 0, m_SufOffsets[suf], needle_sz) != 0) return false;
     }
 
-    DevMsg("match\n");
     //Check if the suffix is unique
     if(suf+1 < m_Sequence.size() && needle.compare(m_Sequence, 0, m_SufOffsets[suf+1], needle_sz) == 0) return false;
 
     *off = m_SufOffsets[suf];
-    DevMsg("suf=%lu off=%lx\n", suf, *off);
     return true;
 }
 
