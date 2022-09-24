@@ -93,22 +93,65 @@ static inline void init_hex_lut() {
     is_initalized = true;
 }
 
-CHexSequence::CHexSequence(const char *hexstr) {
-    size_t len = 0;
-    for(const char *p = hexstr; *p; p++) {
-        if(!isspace(*p)) len++;
-    }
-    if(len % 2 != 0) throw std::invalid_argument("Invalid hex string!");
+CHexSequence::CHexSequence(const char *hexstr, std::initializer_list<const void*> formats) : m_Size(0) {
+    //Determine sequence size
+    std::initializer_list<const void*>::const_iterator formats_iter = formats.begin();
+    for(const char *p = hexstr; *p;) {
+        if(isspace(*p)) {
+            p++;
+            continue;
+        }
 
-    m_Size = len / 2;
+        //Format specifiers
+        if(*p == '$') {
+            if(*(p+1) == '$') {
+                m_Size += ((IByteSequence*) *formats_iter)->size();
+            } else {
+                m_Size += strtol(p+1, (char**) &p, 10);
+            }
+            formats_iter++;
+            continue;
+        }
+
+        //Regular hex char
+        m_Size++;
+        p += 2;
+    }
+
+    //Create sequence data
     m_Data = new uint8_t[m_Size];
 
+    //Determine data
     init_hex_lut();
-    size_t idx = 0;
-    for(const char *p = hexstr; *p; p++) {
-        if(isspace(*p)) continue;
-        m_Data[idx++] = (hex_lut[*p] << 4) | hex_lut[*(p+1)];
-        p++;
+
+    uint8_t *data_ptr = m_Data;
+    formats_iter = formats.begin();
+    for(const char *p = hexstr; *p;) {
+        if(isspace(*p)) {
+            p++;
+            continue;
+        }
+
+        //Format specifiers
+        if(*p == '$') {
+            if(*(p+1) == '$') {
+                //Get sequence data
+                IByteSequence *seq = (IByteSequence*) *formats_iter;
+                seq->get_data(data_ptr, 0, seq->size());
+                data_ptr += seq->size();
+            } else {
+                //Copy buffer provided in formats varars
+                size_t sz = strtol(p+1, (char**) &p, 10);
+                memcpy(data_ptr, *formats_iter, sz);
+                data_ptr += sz;
+            }
+            formats_iter++;
+            continue;
+        }
+
+        //Regular hex char
+        *(data_ptr++) = (hex_lut[*p] << 4) | hex_lut[*(p+1)];
+        p += 2;
     }
 }
 

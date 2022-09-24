@@ -95,7 +95,7 @@ class CArraySequence : public IByteSequence {
 
 class CHexSequence : public IByteSequence {
     public:
-        CHexSequence(const char *hexstr);
+        CHexSequence(const char *hexstr, std::initializer_list<const void*> formats = std::initializer_list<const void*>());
         CHexSequence(const CHexSequence &seq);
         ~CHexSequence();
 
