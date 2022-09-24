@@ -9,7 +9,7 @@
 
 class CMPPatchPlugin : public IServerPluginCallbacks {
     public:
-        static const int MAX_PLAYERS = 0x20;
+        static const uint8_t MAX_PLAYERS = 0x20;
 
         void update_patches();
 
