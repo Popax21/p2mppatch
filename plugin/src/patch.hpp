@@ -17,15 +17,16 @@ class CPatch {
 
     protected:
         SAnchor m_PatchTarget;
-        IByteSequence& m_OrigSeq;
-        IByteSequence& m_NewSeq;
         bool m_IsApplied;
+
+        uint8_t *m_OrigSeq, *m_NewSeq;
+        size_t m_PatchSize;
 };
 
 class IPatchRegistrar {
     public:
         virtual const char *name() const = 0;
-        virtual void register_patches(const CMPPatchPlugin& plugin) = 0;
+        virtual void register_patches(CMPPatchPlugin& plugin) = 0;
 };
 
 #endif
