@@ -1,5 +1,10 @@
 PLUGIN := p2mppatch.so
 SDK ?= $(realpath ../sdk)
+STEAM_RUNTIME_PATH ?= $(realpath ../runtime)
+
+AR := $(STEAM_RUNTIME_PATH)/bin/ar
+CC := $(STEAM_RUNTIME_PATH)/bin/gcc
+CXX := $(STEAM_RUNTIME_PATH)/bin/g++
 
 all: $(PLUGIN)
 
