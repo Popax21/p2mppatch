@@ -11,6 +11,7 @@ struct SAnchor {
     size_t offset;
 
     SAnchor() {}
+    SAnchor(void *ptr) : module(nullptr), offset((size_t) ptr) {}
     SAnchor(const CModule *module, size_t offset) : module(module), offset(offset) {}
 
     void *get_addr() const;

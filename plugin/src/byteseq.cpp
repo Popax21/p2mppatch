@@ -1,25 +1,12 @@
 #include <stdexcept>
 #include "byteseq.hpp"
 
-CSequentialByteSequence::CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs) : m_Size(0), m_NumSeqs(0) {
-    m_Sequences = new seq_ent[seqs.size()];
-    for(IByteSequence *seq : seqs) {
-        m_Sequences[m_NumSeqs++] = seq_ent(m_Size, seq);
-        m_Size += seq->size();
-    }
-}
-
-CSequentialByteSequence::CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size), m_NumSeqs(seq.m_NumSeqs), m_Sequences(seq.m_Sequences) {
-    seq.m_Sequences = nullptr;
-}
-
-CSequentialByteSequence::~CSequentialByteSequence() {
-    delete[] m_Sequences;
-    m_Sequences = nullptr;
+CSequentialByteSequence::CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size) {
+    m_Sequences = std::move(seq.m_Sequences);
 }
 
 bool CSequentialByteSequence::set_anchor(SAnchor anchor) {
-    for(int i = 0; i < m_NumSeqs; i++) {
+    for(int i = 0; i < m_Sequences.size(); i++) {
         const seq_ent& ent = m_Sequences[i];
         if(!ent.seq->set_anchor(anchor + ent.off)) return false;
     }
@@ -70,7 +57,7 @@ void CSequentialByteSequence::get_data(uint8_t *buf, size_t off, size_t size) co
 }
 
 const CSequentialByteSequence::seq_ent& CSequentialByteSequence::get_sequence(size_t off) const {
-    int s = 0, e = m_NumSeqs;
+    int s = 0, e = m_Sequences.size();
     while(s < e-1) {
         int m = s + (e-s) / 2;
         if(off < m_Sequences[m].off) e = m;

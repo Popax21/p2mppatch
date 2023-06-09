@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <vector>
 #include <initializer_list>
 #include <memory>
 #include <stdexcept>
@@ -46,9 +47,22 @@ class IByteSequence {
 
 class CSequentialByteSequence : public IByteSequence {
     public:
-        CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs);
+        CSequentialByteSequence() {}
         CSequentialByteSequence(CSequentialByteSequence &seq);
-        ~CSequentialByteSequence();
+        ~CSequentialByteSequence() {}
+
+        void add_sequence(std::unique_ptr<IByteSequence> ptr) {
+            size_t size = ptr->size();
+            m_Sequences.emplace_back(m_Size, std::move(ptr));
+            m_Size += ptr->size();
+        }
+
+        template<typename SeqType, typename... Args> SeqType& emplace_sequence(Args... args) {
+            auto ptr = std::unique_ptr<SeqType>(new SeqType(args...));
+            SeqType& seq = *ptr;
+            add_sequence(std::move(ptr));
+            return seq;
+        }
 
         virtual size_t size() const { return m_Size; };
 
@@ -66,17 +80,16 @@ class CSequentialByteSequence : public IByteSequence {
     private:
         struct seq_ent {
             size_t off;
-            IByteSequence* seq;
+            std::unique_ptr<IByteSequence> seq;
 
             inline seq_ent() : off(0), seq(nullptr) {}
-            inline seq_ent(size_t off, IByteSequence* seq) : off(off), seq(seq) {}
+            inline seq_ent(size_t off, std::unique_ptr<IByteSequence> seq) : off(off), seq(std::move(seq)) {}
         };
 
         const seq_ent& get_sequence(size_t off) const;
 
         size_t m_Size;
-        int m_NumSeqs;
-        seq_ent *m_Sequences;
+        std::vector<seq_ent> m_Sequences;
 };
 
 class CArraySequence : public IByteSequence {
@@ -125,7 +138,7 @@ class CStringSequence : public IByteSequence {
 
 class CRefInstructionSequence : public IByteSequence {
     public:
-        CRefInstructionSequence(const IByteSequence& opcode, SAnchor anchor) : m_Opcode(opcode), m_RefAnchor(anchor), m_IsAnchored(false) {}
+        CRefInstructionSequence(std::vector<uint8_t> opcode, SAnchor anchor) : m_Opcode(opcode), m_RefAnchor(anchor), m_IsAnchored(false) {}
 
         virtual size_t size() const { return m_Opcode.size() + sizeof(size_t); };
 
@@ -147,7 +160,8 @@ class CRefInstructionSequence : public IByteSequence {
         }
 
     private:
-        const IByteSequence& m_Opcode;
+        std::vector<uint8_t> m_Opcode;
+        uint64_t m_OpcodeBytes;
         SAnchor m_RefAnchor;
 
         bool m_IsAnchored;
@@ -155,15 +169,16 @@ class CRefInstructionSequence : public IByteSequence {
 };
 
 #define SEQ_SEQ(...) CSequentialByteSequence({ __VA_ARGS__ })
-#define SEQ_HEX(str) CHexSequence(str)
+#define SEQ_HEX(str, ...) CHexSequence(str, { __VA_ARGS__ })
 #define SEQ_STR(str) CStringSequence(str)
-#define SEQ_JMP(ref) CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0xe9 }, 1), ref)
-#define SEQ_JZ(ref)  CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x84 }, 2), ref)
-#define SEQ_JNZ(ref) CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x85 }, 2), ref)
-#define SEQ_JL(ref)  CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x8c }, 2), ref)
-#define SEQ_JNL(ref) CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x8d }, 2), ref)
-#define SEQ_JG(ref)  CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x8f }, 2), ref)
-#define SEQ_JNG(ref) CRefInstructionSequence(CArraySequence((const uint8_t[]) { 0x0f, 0x8e }, 2), ref)
+#define SEQ_CALL(ref) CRefInstructionSequence({ 0xe8 }, ref)
+#define SEQ_JMP(ref) CRefInstructionSequence({ 0xe9 }, ref)
+#define SEQ_JZ(ref)  CRefInstructionSequence({ 0x0f, 0x84 }, ref)
+#define SEQ_JNZ(ref) CRefInstructionSequence({ 0x0f, 0x85 }, ref)
+#define SEQ_JL(ref)  CRefInstructionSequence({ 0x0f, 0x8c }, ref)
+#define SEQ_JNL(ref) CRefInstructionSequence({ 0x0f, 0x8d }, ref)
+#define SEQ_JG(ref)  CRefInstructionSequence({ 0x0f, 0x8f }, ref)
+#define SEQ_JNG(ref) CRefInstructionSequence({ 0x0f, 0x8e }, ref)
 #define SEQ_JLE(ref) SEQ_JNG(ref)
 #define SEQ_JGE(ref) SEQ_JNL(ref)
 
