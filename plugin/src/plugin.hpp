@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <memory>
-#include <engine/iserverplugin.h>
+#include "callbacks.hpp"
 #include "module.hpp"
 #include "patch.hpp"
 
@@ -34,6 +34,7 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         virtual void LevelShutdown(void);
 
         virtual void ClientActive(edict_t *pEntity);
+        virtual void ClientFullyConnect(edict_t *pEntity);
         virtual void ClientDisconnect(edict_t *pEntity);
         virtual void ClientPutInServer(edict_t *pEntity, char const *playername);
         virtual void SetCommandClient(int index);

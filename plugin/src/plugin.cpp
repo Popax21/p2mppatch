@@ -3,13 +3,14 @@
 #include <tier0/platform.h>
 #include <tier1/tier1.h>
 #include <tier2/tier2.h>
-#include <engine/iserverplugin.h>
+
 #include <tier0/valve_minmax_off.h>
 #include "plugin.hpp"
 #include "module.hpp"
 #include "patch.hpp"
 
 #include "patches/player_count.h"
+#include "patches/dc_check.h"
 
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
     return localtime_r(timep, result);
@@ -60,6 +61,7 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
         //Prearing registrars
         Msg("Preparing registrars...\n");
         m_PatchRegistrars.emplace_back(new patches::CPlayerCountPatch(MAX_PLAYERS));
+        m_PatchRegistrars.emplace_back(new patches::CDCCheckPatch());
 
         //Apply patches
         update_patches();
@@ -116,6 +118,7 @@ void CMPPatchPlugin::GameFrame(bool simulating) {}
 void CMPPatchPlugin::LevelShutdown(void) {}
 
 void CMPPatchPlugin::ClientActive(edict_t *pEntity) {}
+void CMPPatchPlugin::ClientFullyConnect(edict_t *pEntity) {}
 void CMPPatchPlugin::ClientDisconnect(edict_t *pEntity) {}
 void CMPPatchPlugin::ClientPutInServer(edict_t *pEntity, char const *playername) {}
 void CMPPatchPlugin::SetCommandClient(int index) {}
