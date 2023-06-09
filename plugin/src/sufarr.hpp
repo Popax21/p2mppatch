@@ -25,7 +25,7 @@ class CSuffixArray {
         const IByteSequence& m_Sequence;
 
         size_t m_MaxNeedleSize;
-        std::unique_ptr<size_t[]> m_LexNames, m_TmpBuildArr, m_BucketIdxs;
+        std::unique_ptr<size_t[]> m_LexNames, m_TmpBuildArr, m_BucketIdxs, m_BucketIdxsOff;
 };
 
 #endif

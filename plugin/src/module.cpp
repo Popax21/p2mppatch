@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <chrono>
 #include <system_error>
 #include <tier0/dbg.h>
 #include "module.hpp"
@@ -95,8 +96,11 @@ CModule::CModule(const char *name) : m_Name(name) {
     if(!find_module(name, &m_BaseAddr, &m_Size, &m_PageFlags)) throw std::runtime_error("Can't find module '" + std::string(name) + "'!");
 
     //Build suffix array
+    using namespace std::chrono;
+    auto t1 = high_resolution_clock::now();
     m_SufArray = new CSuffixArray(*this, MAX_NEEDLE_SIZE);
-    DevMsg("Constructed suffix array for module '%s' [%d kB]\n", name, m_SufArray->get_mem_usage() / 1024);
+    auto t2 = high_resolution_clock::now();
+    DevMsg("Constructed suffix array for module '%s' [%d kB], took %dms\n", name, m_SufArray->get_mem_usage() / 1024, (int) duration_cast<milliseconds>(t2 - t1).count());
 }
 
 CModule::~CModule() {
@@ -161,11 +165,15 @@ void CModule::get_data(uint8_t *buf, size_t off, size_t size) const {
 
 SAnchor CModule::find_seq_anchor(const IByteSequence &seq) const {
     size_t off;
+
+    using namespace std::chrono;
+    auto t1 = high_resolution_clock::now();
     if(!m_SufArray->find_needle(seq, &off)) throw std::runtime_error("Can't find sequence needle [" + std::to_string(seq.size()) + " bytes] in module '" + std::string(m_Name) + "'");
+    auto t2 = high_resolution_clock::now();
 
     DevMsg("Found sequence anchor for sequence '");
     for(size_t i = 0; i < seq.size(); i++) DevMsg("%02x", seq[i]);
-    DevMsg("' [%d bytes] in module '%s' at offset 0x%llx\n", seq.size(), m_Name, off);
+    DevMsg("' [%d bytes] in module '%s' at offset 0x%zx, took %dms\n", seq.size(), m_Name, off, (int) duration_cast<milliseconds>(t2 - t1).count());
 
     return SAnchor(this, off); 
 }
