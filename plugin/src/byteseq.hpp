@@ -16,12 +16,14 @@ class IByteSequence {
     public:
         virtual ~IByteSequence() {}
 
+        virtual bool has_data() const { return true; }
         virtual size_t size() const = 0;
         virtual const uint8_t *buffer() const { return nullptr; }
 
         virtual bool apply_anchor(SAnchor anchor) { return true; }
 
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
+            if(!seq.has_data()) return seq.compare(*this, seq_off, this_off, size);
             const uint8_t *this_buf = buffer(), *seq_buf = seq.buffer();
             if( this_buf &&  seq_buf) return memcmp(this_buf + this_off, seq_buf + seq_off, size);
             if( this_buf && !seq_buf) return -seq.compare(this_buf + this_off, seq_off, size);
@@ -45,19 +47,6 @@ class IByteSequence {
 
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const = 0;
         virtual uint8_t operator [](size_t off) const = 0;
-};
-
-class CFillByteSequence : public IByteSequence {
-    public:
-        CFillByteSequence(int size, uint8_t fill) : m_Size(size), m_Fill(fill) {}
-
-        virtual size_t size() const { return m_Size; };
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memset(buf, m_Fill, size); }
-        inline virtual uint8_t operator [](size_t off) const { return m_Fill; }
-
-    private:
-        int m_Size;
-        uint8_t m_Fill;
 };
 
 class CSequentialByteSequence : public IByteSequence {
@@ -108,6 +97,37 @@ class CSequentialByteSequence : public IByteSequence {
         std::vector<seq_ent> m_Sequences;
 };
 
+class CIgnoreSequence : public IByteSequence {
+    public:
+        CIgnoreSequence(size_t size) : m_Size(size) {}
+
+        virtual bool has_data() const { return false; }
+        virtual size_t size() const { return m_Size; };
+
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const { return 0; }
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const { return 0; }
+
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { throw std::runtime_error("Can't access the data of an CIgnoreSequence!"); }
+        inline virtual uint8_t operator [](size_t off) const { return 0x42; }
+
+    private:
+        size_t m_Size;
+        uint8_t m_Fill;
+};
+
+class CFillSequence : public IByteSequence {
+    public:
+        CFillSequence(size_t size, uint8_t fill) : m_Size(size), m_Fill(fill) {}
+
+        virtual size_t size() const { return m_Size; };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memset(buf, m_Fill, size); }
+        inline virtual uint8_t operator [](size_t off) const { return m_Fill; }
+
+    private:
+        size_t m_Size;
+        uint8_t m_Fill;
+};
+
 class CArraySequence : public IByteSequence {
     public:
         CArraySequence(const uint8_t *data, size_t size) : m_Data(data), m_Size(size) {}
@@ -143,15 +163,35 @@ class CHexSequence : public IByteSequence {
     public:
         CHexSequence(const char *hexstr, std::initializer_list<const void*> formats = std::initializer_list<const void*>());
         CHexSequence(const CHexSequence &seq);
-        ~CHexSequence();
+        virtual ~CHexSequence();
 
         virtual size_t size() const { return m_Size; };
         virtual const uint8_t *buffer() const { return m_Data; };
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memcpy(buf, m_Data+off, size); }
         virtual uint8_t operator [](size_t off) const { return m_Data[off]; }
 
-    private:
+    protected:
         uint8_t *m_Data;
+        size_t m_Size;
+};
+
+class CMaskedHexSequence : public IByteSequence {
+    public:
+        CMaskedHexSequence(const char *hexstr);
+        CMaskedHexSequence(const CMaskedHexSequence &seq);
+        virtual ~CMaskedHexSequence();
+
+        virtual bool has_data() const { return false; }
+        virtual size_t size() const { return m_Size; };
+
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const;
+
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { throw std::runtime_error("Can't access the data of an CMaskedHexSequence!"); }
+        virtual uint8_t operator [](size_t off) const { return 0x42; }
+
+    protected:
+        uint8_t *m_Data, *m_DataMask;
         size_t m_Size;
 };
 
@@ -204,7 +244,10 @@ class CRefInstructionSequence : public IByteSequence {
 };
 
 #define SEQ_SEQ(...) CSequentialByteSequence({ __VA_ARGS__ })
+#define SEQ_IGN(len) CIgnoreSequence(len, val)
+#define SEQ_FILL(len, val) CFillSequence(len, val)
 #define SEQ_HEX(str, ...) CHexSequence(str, { __VA_ARGS__ })
+#define SEQ_MASKED_HEX(str) CMaskedHexSequence(str)
 #define SEQ_STR(str) CStringSequence(str)
 #define SEQ_CALL(ref) CRefInstructionSequence({ 0xe8 }, ref)
 #define SEQ_JMP(ref) CRefInstructionSequence({ 0xe9 }, ref)

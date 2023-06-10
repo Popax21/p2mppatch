@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <memory>
+#include <tier1/convar.h>
 #include "callbacks.hpp"
 #include "module.hpp"
 #include "scratchpad.hpp"

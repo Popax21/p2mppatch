@@ -9,9 +9,9 @@
 #include "module.hpp"
 #include "patch.hpp"
 
-#include "patches/player_count.h"
-#include "patches/dc_check.h"
-#include "patches/transitions_fix.h"
+#include "patches/player_count.hpp"
+#include "patches/dc_check.hpp"
+#include "patches/transitions_fix.hpp"
 
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
     return localtime_r(timep, result);
@@ -102,7 +102,7 @@ void CMPPatchPlugin::Unload() {
         delete m_ServerModule;
 
         //Clear the scratchpad
-        Msg("Clearing scratchpad... (%zu bytes)\n", m_ScratchPad.total_size());
+        Msg("Clearing scratchpad...\n");
         m_ScratchPad.clear();
 
         Msg("Done!\n");

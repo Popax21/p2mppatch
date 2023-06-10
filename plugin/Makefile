@@ -8,7 +8,7 @@ CXX := $(STEAM_RUNTIME_PATH)/bin/g++
 
 all: $(PLUGIN)
 
-SRC := plugin.cpp byteseq.cpp module.cpp anchor.cpp sufarr.cpp scratchpad.cpp patch.cpp detour.cpp
+SRC := plugin.cpp byteseq.cpp module.cpp anchor.cpp sufarr.cpp scratchpad.cpp patch.cpp detour.cpp patches/transitions_fix.cpp
 SRC := $(addprefix src/, $(SRC))
 OBJ := $(addprefix obj/, $(SRC:.cpp=.o))
 

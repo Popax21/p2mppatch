@@ -22,6 +22,7 @@ class CPatch {
 
         std::unique_ptr<IByteSequence> m_OrigSeq, m_NewSeq;
         size_t m_PatchSize;
+        uint8_t *m_OrigData;
 };
 
 class IPatchRegistrar {

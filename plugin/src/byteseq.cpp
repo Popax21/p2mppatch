@@ -147,3 +147,63 @@ CHexSequence::~CHexSequence() {
     delete[] m_Data;
     m_Data = nullptr;
 }
+
+CMaskedHexSequence::CMaskedHexSequence(const char *hexstr) : m_Size(0) {
+    //Determine sequence size
+    for(const char *p = hexstr; *p;) {
+        if(isspace(*p)) {
+            p++;
+        } else {
+            m_Size++;
+            p += 2;
+        }
+    }
+
+    //Create sequence data
+    m_Data = new uint8_t[m_Size];
+    m_DataMask = new uint8_t[m_Size];
+
+    //Determine data
+    init_hex_lut();
+
+    uint8_t *data_ptr = m_Data, *mask_ptr = m_DataMask;
+    for(const char *p = hexstr; *p;) {
+        if(isspace(*p)) {
+            p++;
+        } else {
+            *(data_ptr++) = (hex_lut[*p] << 4) | hex_lut[*(p+1)];
+            *(mask_ptr++) = ((*p == '?' ? 0x0 : 0xf) << 4) | (*(p+1) == '?' ? 0x0 : 0xf);
+            p += 2;
+        }
+    }
+}
+
+CMaskedHexSequence::CMaskedHexSequence(const CMaskedHexSequence &seq) {
+    m_Data = new uint8_t[m_Size = seq.m_Size];
+    m_DataMask = new uint8_t[m_Size];
+    memcpy(m_Data, seq.m_Data, m_Size);
+    memcpy(m_DataMask, seq.m_DataMask, m_Size);
+}
+
+CMaskedHexSequence::~CMaskedHexSequence() {
+    delete[] m_Data;
+    delete[] m_DataMask;
+    m_Data = nullptr;
+    m_DataMask = nullptr;
+}
+
+int CMaskedHexSequence::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
+    for(; size > 0; this_off++, seq_off++, size--) {
+        uint8_t mask = m_DataMask[this_off];
+        if((m_Data[this_off] & mask) != (seq[seq_off] & mask)) return (m_Data[this_off] & mask) < (seq[seq_off] & mask) ? -1 : +1;
+    }
+    return 0;
+}
+
+int CMaskedHexSequence::compare(const uint8_t *buf, size_t off, size_t size) const {
+    for(; size > 0; buf++, off++, size--) {
+        uint8_t mask = m_DataMask[off];
+        if((m_Data[off] & mask) != (*buf & mask)) return (m_Data[off] & mask) < (*buf & mask) ? -1 : +1;
+    }
+    return 0;
+}

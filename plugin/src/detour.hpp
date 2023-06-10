@@ -22,7 +22,7 @@ class CDetour : public IByteSequence {
 
         static const int MIN_SIZE = 5;
 
-        CDetour(CScratchPad& scratch, int size, void *func, std::initializer_list<SArgument> args) : m_ScratchPad(scratch), m_DetourSize(size), m_DetourFunc(func), m_DetourArgs(args) {
+        CDetour(CScratchPad& scratch, int size, void *func, std::initializer_list<SArgument> args, bool copy_orig = false) : m_ScratchPad(scratch), m_DetourSize(size), m_DetourFunc(func), m_DetourArgs(args), m_DetourCopyOrigAsm(copy_orig) {
             if(size < MIN_SIZE) throw std::runtime_error("Invalid detour patchsite size!");
         }
         virtual ~CDetour() {}
@@ -60,6 +60,7 @@ class CDetour : public IByteSequence {
         int m_DetourSize;
         void *m_DetourFunc;
         const std::vector<SArgument> m_DetourArgs;
+        bool m_DetourCopyOrigAsm;
 
         CScratchPad::SSeqEntry m_ScratchPadEntry;
         std::unique_ptr<IByteSequence> m_DetourJumpSeq;
@@ -74,5 +75,6 @@ class CDetour : public IByteSequence {
 #define DETOUR_ARG_LOCAL(ebp_off) CDetour::SArgument::local_var(ebp_off)
 
 #define SEQ_DETOUR(plugin, size, func, ...) CDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ })
+#define SEQ_DETOUR_COPY_ORIG(plugin, size, func, ...) CDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ }, true)
 
 #endif

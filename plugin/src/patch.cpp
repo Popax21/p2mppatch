@@ -4,6 +4,7 @@
 
 CPatch::CPatch(SAnchor target, IByteSequence *orig_seq, IByteSequence *new_seq) : m_PatchTarget(target), m_IsApplied(false), m_OrigSeq(orig_seq), m_NewSeq(new_seq), m_PatchSize(orig_seq->size()) {
     if(orig_seq->size() != new_seq->size()) throw std::invalid_argument("Original and new sequences must be of the same size [" + std::to_string(orig_seq->size()) + " != " + std::to_string(new_seq->size()) + "]");
+    m_OrigData = new uint8_t[m_PatchSize];
 }
 
 CPatch::CPatch(CPatch& patch) : m_PatchTarget(patch.m_PatchTarget), m_IsApplied(patch.m_IsApplied) {
@@ -14,6 +15,9 @@ CPatch::CPatch(CPatch& patch) : m_PatchTarget(patch.m_PatchTarget), m_IsApplied(
 
 CPatch::~CPatch() {
     if(m_IsApplied) revert();
+
+    if(m_OrigData) delete[] m_OrigData;
+    m_OrigData = nullptr;
 }
 
 void CPatch::apply() {
@@ -37,7 +41,9 @@ void CPatch::apply() {
     }
 
     //Overwrite the target data
-    m_NewSeq->get_data((uint8_t*) m_PatchTarget.get_addr(), 0, m_PatchSize);
+    uint8_t *patch_target = (uint8_t*) m_PatchTarget.get_addr();
+    memcpy(m_OrigData, patch_target, m_PatchSize);
+    m_NewSeq->get_data(patch_target, 0, m_PatchSize);
 
     std::string target_str = m_PatchTarget.debug_str();
     DevMsg("Patched %d bytes at location %s\n", m_PatchSize, target_str.c_str());
@@ -48,7 +54,7 @@ void CPatch::revert() {
     if(!m_IsApplied) return;
 
     //Re-apply the original sequence
-    m_OrigSeq->get_data((uint8_t*) m_PatchTarget.get_addr(), 0, m_PatchSize);
+    memcpy(m_PatchTarget.get_addr(), m_OrigData, m_PatchSize);
 
     std::string target_str = m_PatchTarget.debug_str();
     DevMsg("Reverted patch of %d bytes at location %s\n", m_PatchSize, target_str.c_str());

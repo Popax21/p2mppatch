@@ -20,7 +20,7 @@ bool CDetour::apply_anchor(SAnchor anchor) {
     prefix_seq.push_back(0x60); //pusha
     unsigned int pusha_esp_off = 0;
 
-    for(int i = 0; i < m_DetourArgs.size(); i++) {
+    for(int i = m_DetourArgs.size()-1; i >= 0; i--) {
         const SArgument& arg = m_DetourArgs[i];
         if(arg.is_reg) {
             //lea eax, [esp + <offset to value in pusha block>]
@@ -48,6 +48,9 @@ bool CDetour::apply_anchor(SAnchor anchor) {
     suffix_seq.push_back(0x61); //popa
     scratch_seq.emplace_sequence<CVectorSequence>(suffix_seq);
 
+    // - optionally copy the original asm
+    if(m_DetourCopyOrigAsm) scratch_seq.emplace_sequence<CArraySequence>((const uint8_t*) anchor.get_addr(), m_DetourSize);
+
     // - jump back to the detoured code
     scratch_seq.add_sequence(new SEQ_JMP(anchor + m_DetourSize));
 
@@ -58,7 +61,7 @@ bool CDetour::apply_anchor(SAnchor anchor) {
     if(m_DetourSize > MIN_SIZE) {
         auto jump_seq = std::unique_ptr<CSequentialByteSequence>(new CSequentialByteSequence());
         jump_seq->add_sequence(new SEQ_JMP(m_ScratchPadEntry.anchor()));
-        jump_seq->emplace_sequence<CFillByteSequence>(m_DetourSize - MIN_SIZE, 0x90); //Fill with NOPs
+        jump_seq->emplace_sequence<CFillSequence>(m_DetourSize - MIN_SIZE, 0x90); //Fill with NOPs
         m_DetourJumpSeq = std::unique_ptr<IByteSequence>(jump_seq.release());
     } else {
         m_DetourJumpSeq = std::unique_ptr<CRefInstructionSequence>(new SEQ_JMP(m_ScratchPadEntry.anchor()));
