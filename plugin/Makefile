@@ -18,19 +18,21 @@ SDKDYNLIB := tier0
 SDKSTATLIB := tier1.a mathlib.a tier2.a
 SDKSTATLIB := $(addprefix $(SDK)/mp/src/lib/public/linux32/, $(SDKSTATLIB))
 
-CPPFLAGS := -O3 -g3 -m32 -std=gnu++0x -march=core2 -mtune=core2 -msse2 -mfpmath=sse -fpermissive -DNO_HOOK_MALLOC -DNO_MALLOC_OVERRIDE -DGNUC -DCOMPILER_GCC -DPOSIX -D_POSIX -DLINUX -D_LINUX -DDLLNAME=p2mppatch
-CFLAGAS := $(CPPFLAGS) -I"src" -I"$(SDK)/mp/src/public" -I"$(SDK)/mp/src/public/tier0" -I"$(SDK)/mp/src/public/tier1" -I"$(COMPILER)/include/c++/4.6.3"
+# OPTFLAGS ?= -O0 -g3
+OPTFLAGS ?= -O3 -g3
+CPPFLAGS := $(OPTFLAGS) -m32 -std=gnu++0x -march=core2 -mtune=core2 -msse2 -mfpmath=sse -fpermissive -DNO_HOOK_MALLOC -DNO_MALLOC_OVERRIDE -DGNUC -DCOMPILER_GCC -DPOSIX -D_POSIX -DLINUX -D_LINUX -DDLLNAME=p2mppatch
+CFLAGS := $(CPPFLAGS) -I"src" -I"$(SDK)/mp/src/public" -I"$(SDK)/mp/src/public/tier0" -I"$(SDK)/mp/src/public/tier1" -I"$(COMPILER)/include/c++/4.6.3"
 LFLAGS := $(CPPFLAGS) -shared -Wl,--no-undefined -L"$(SDK)/mp/src/lib/public/linux32" -u _CreateInterface -lm -ldl -lpthread
 
 -include $(OBJ:.o=.d)
 
 obj/src/%.o: src/%.cpp
 	@mkdir -p $$(dirname "$@")
-	$(CXX) $(CFLAGAS) -c -MMD -o "$@" "$<"
+	$(CXX) $(CFLAGS) -c -MMD -o "$@" "$<"
 
 obj/sdk/memoverride.o: $(SDK)/mp/src/public/tier0/memoverride.cpp
 	@mkdir -p $$(dirname "$@")
-	$(CXX) $(CFLAGAS) -c -o "$@" "$<"
+	$(CXX) $(CFLAGS) -c -o "$@" "$<"
 
 $(PLUGIN): $(OBJ) $(SDKOBJ)
 	$(CXX) $(LFLAGS) -o "$@" $^ $(addprefix -l,$(SDKDYNLIB)) $(SDKSTATLIB)

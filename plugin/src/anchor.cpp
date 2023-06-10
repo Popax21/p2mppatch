@@ -10,4 +10,4 @@ std::string SAnchor::debug_str() const {
     return stream.str();
 }
 
-size_t SAnchor::operator -(SAnchor anchor) const { return (uintptr_t) anchor.get_addr() - (uintptr_t) get_addr(); }
+size_t SAnchor::operator -(SAnchor anchor) const { return (uintptr_t) get_addr() - (uintptr_t) anchor.get_addr(); }

@@ -3,12 +3,12 @@
 #include <vector>
 #include "detour.hpp"
 
-const CDetour::SArgument CDetour::SArgument::REG_EAX(true, 0);
-const CDetour::SArgument CDetour::SArgument::REG_EBX(true, 3);
-const CDetour::SArgument CDetour::SArgument::REG_ECX(true, 2);
-const CDetour::SArgument CDetour::SArgument::REG_EDX(true, 1);
-const CDetour::SArgument CDetour::SArgument::REG_ESI(true, 6);
-const CDetour::SArgument CDetour::SArgument::REG_EDI(true, 7);
+const CDetour::SArgument CDetour::SArgument::reg_eax(true, 7 - 0);
+const CDetour::SArgument CDetour::SArgument::reg_ebx(true, 7 - 3);
+const CDetour::SArgument CDetour::SArgument::reg_ecx(true, 7 - 2);
+const CDetour::SArgument CDetour::SArgument::reg_edx(true, 7 - 1);
+const CDetour::SArgument CDetour::SArgument::reg_esi(true, 7 - 6);
+const CDetour::SArgument CDetour::SArgument::reg_edi(true, 7 - 7);
 
 bool CDetour::apply_anchor(SAnchor anchor) {
     //Build the scratchpad sequence
@@ -16,42 +16,39 @@ bool CDetour::apply_anchor(SAnchor anchor) {
 
     // - push arguments
     std::vector<uint8_t> prefix_seq;
+
     prefix_seq.push_back(0x60); //pusha
+    unsigned int pusha_esp_off = 0;
+
     for(int i = 0; i < m_DetourArgs.size(); i++) {
         const SArgument& arg = m_DetourArgs[i];
         if(arg.is_reg) {
-            //push <reg>
-            prefix_seq.push_back(0x50 + arg.val);
+            //lea eax, [esp + <offset to value in pusha block>]
+            unsigned int off = pusha_esp_off + arg.val * 4;
+            prefix_seq.insert(prefix_seq.end(), { 0x8d, 0x84, 0x24 });
+            prefix_seq.insert(prefix_seq.end(), (uint8_t*) &off, ((uint8_t*) &off) + 4);
         } else {
-            //add ebp, <offset>
-            //push ebp
-            //sub ebp, <offset>
-            prefix_seq.insert(prefix_seq.end(), { 0x81, 0xc4 });
-            prefix_seq.insert(prefix_seq.end(), (uint8_t*) &arg.val, ((uint8_t*) &arg.val) + 4);
-            prefix_seq.push_back(0x55);
-            prefix_seq.insert(prefix_seq.end(), { 0x81, 0xec });
+            //lea eax, [ebp + <offset>]
+            prefix_seq.insert(prefix_seq.end(), { 0x8d, 0x85 });
             prefix_seq.insert(prefix_seq.end(), (uint8_t*) &arg.val, ((uint8_t*) &arg.val) + 4);
         }
+        //push eax
+        prefix_seq.push_back(0x50);
+        pusha_esp_off += 4;
     }
+
     scratch_seq.emplace_sequence<CVectorSequence>(prefix_seq);
 
+    // - call the detour function
     scratch_seq.add_sequence(new SEQ_CALL(SAnchor(m_DetourFunc)));
 
     // - pop arguments
     std::vector<uint8_t> suffix_seq;
-    for(int i = m_DetourArgs.size() - 1; i >= 0; i--) {
-        const SArgument& arg = m_DetourArgs[i];
-        if(arg.is_reg) {
-            //pop <reg>
-            suffix_seq.push_back(0x58 + arg.val);
-        } else {
-            //add esp, 4
-            suffix_seq.insert(suffix_seq.end(), { 0x83, 0xc4, 0x32 });
-        }
-    }
+    suffix_seq.insert(suffix_seq.end(), { 0x83, 0xc4, (uint8_t) (0x04 * m_DetourArgs.size()) }); //add esp, <4 * numArgs>
     suffix_seq.push_back(0x61); //popa
     scratch_seq.emplace_sequence<CVectorSequence>(suffix_seq);
 
+    // - jump back to the detoured code
     scratch_seq.add_sequence(new SEQ_JMP(anchor + m_DetourSize));
 
     //Allocate the sequence on the scratchpad

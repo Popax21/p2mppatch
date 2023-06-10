@@ -1,5 +1,3 @@
-#pragma GCC optimize("O3")
-
 #include <assert.h>
 #include <tier0/dbg.h>
 #include <chrono>

@@ -15,7 +15,7 @@ class CDetour : public IByteSequence {
 
             SArgument(bool is_reg, int val) : is_reg(is_reg), val(val) {}
 
-            static const SArgument REG_EAX, REG_EBX, REG_ECX, REG_EDX, REG_ESI, REG_EDI;
+            static const SArgument reg_eax, reg_ebx, reg_ecx, reg_edx, reg_esi, reg_edi;
 
             static inline SArgument local_var(int ebp_off) { return SArgument(false, ebp_off); };
         };
@@ -65,14 +65,14 @@ class CDetour : public IByteSequence {
         std::unique_ptr<IByteSequence> m_DetourJumpSeq;
 };
 
-#define DETOUR_ARG_EAX CDetour::SArgument::REG_EAX
-#define DETOUR_ARG_EBX CDetour::SArgument::REG_EBX
-#define DETOUR_ARG_ECX CDetour::SArgument::REG_ECX
-#define DETOUR_ARG_EDX CDetour::SArgument::REG_EDX
-#define DETOUR_ARG_ESI CDetour::SArgument::REG_ESI
-#define DETOUR_ARG_EDI CDetour::SArgument::REG_EDI
+#define DETOUR_ARG_EAX CDetour::SArgument::reg_eax
+#define DETOUR_ARG_EBX CDetour::SArgument::reg_ebx
+#define DETOUR_ARG_ECX CDetour::SArgument::reg_ecx
+#define DETOUR_ARG_EDX CDetour::SArgument::reg_edx
+#define DETOUR_ARG_ESI CDetour::SArgument::reg_esi
+#define DETOUR_ARG_EDI CDetour::SArgument::reg_edi
 #define DETOUR_ARG_LOCAL(ebp_off) CDetour::SArgument::local_var(ebp_off)
 
-#define SEQ_DETOUR(plugin, size, func, ...) CDetour(plugin.scratchpad(), size, (void*) func, { })
+#define SEQ_DETOUR(plugin, size, func, ...) CDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ })
 
 #endif

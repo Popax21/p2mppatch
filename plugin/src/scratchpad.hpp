@@ -26,6 +26,7 @@ class CScratchPad {
                     m_Anchor = v.m_Anchor;
                     m_SeqSize = v.m_SeqSize;
                     v.m_ScratchPad = nullptr;
+                    return *this;
                 }
 
             private:

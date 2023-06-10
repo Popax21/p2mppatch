@@ -190,8 +190,8 @@ class CRefInstructionSequence : public IByteSequence {
             if(!m_IsAnchored) throw std::runtime_error("Can't access content of CRefInstructionSequence when not anchored!");
             if(off < m_Opcode.size()) return m_Opcode[off];
 
-            size_t rel = m_RefAnchor + size() - m_InstrAnchor;
-            return ((uint8_t*) &rel)[off-1];
+            size_t rel = m_RefAnchor - (m_InstrAnchor + size());
+            return ((uint8_t*) &rel)[off - m_Opcode.size()];
         }
 
     private:
