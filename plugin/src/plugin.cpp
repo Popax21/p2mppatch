@@ -12,6 +12,7 @@
 #include "patches/player_count.hpp"
 #include "patches/dc_check.hpp"
 #include "patches/transitions_fix.hpp"
+#include "patches/env_fade.hpp"
 
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
     return localtime_r(timep, result);
@@ -64,6 +65,7 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
         m_PatchRegistrars.emplace_back(new patches::CPlayerCountPatch(MAX_PLAYERS));
         m_PatchRegistrars.emplace_back(new patches::CDCCheckPatch());
         m_PatchRegistrars.emplace_back(new patches::CTransitionsFixPatch());
+        m_PatchRegistrars.emplace_back(new patches::CEnvFadePatch());
 
         //Apply patches
         update_patches();

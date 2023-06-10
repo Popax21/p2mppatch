@@ -53,6 +53,11 @@ namespace patches {
             const SFuncAnchor PlayerTransitionCompleteThink("8b 5c 24 28 8b 10 68 00 00 f8 3f 6a 00", 0xa);
         }
 
+        namespace CEnvFade {
+            const SFuncAnchor InputFade("89 c2 83 e2 01 29 d3 89 da 83 ca 04 a8 02 0f 45 da 89 da 83 ca 08 a8 08 0f 45 da a8 04", 0x16);
+            const SFuncAnchor InputReverseFade("89 c6 83 e6 01 83 c6 01 89 f2 83 ca 04 a8 02 0f 45 f2 89 f2 83 ca 08 a8 08 0f 45 f2", 0x20);
+        }
+
         //>>>>> matchmaking anchors <<<<<
 
         namespace CMatchTitleGameSettingsMgr {
