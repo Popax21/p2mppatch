@@ -24,6 +24,7 @@ class CScratchPad {
                     m_ScratchPad = v.m_ScratchPad;
                     m_PageIdx = v.m_PageIdx;
                     m_Anchor = v.m_Anchor;
+                    m_SeqSize = v.m_SeqSize;
                     v.m_ScratchPad = nullptr;
                 }
 
