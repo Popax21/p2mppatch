@@ -1,14 +1,10 @@
 #include <stdexcept>
 #include "byteseq.hpp"
 
-CSequentialByteSequence::CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size) {
-    m_Sequences = std::move(seq.m_Sequences);
-}
-
-bool CSequentialByteSequence::set_anchor(SAnchor anchor) {
+bool CSequentialByteSequence::apply_anchor(SAnchor anchor) {
     for(int i = 0; i < m_Sequences.size(); i++) {
         const seq_ent& ent = m_Sequences[i];
-        if(!ent.seq->set_anchor(anchor + ent.off)) return false;
+        if(!ent.seq->apply_anchor(anchor + ent.off)) return false;
     }
     return true;
 }

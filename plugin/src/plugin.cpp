@@ -11,6 +11,7 @@
 
 #include "patches/player_count.h"
 #include "patches/dc_check.h"
+#include "patches/transitions_fix.h"
 
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
     return localtime_r(timep, result);
@@ -62,6 +63,7 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
         Msg("Preparing registrars...\n");
         m_PatchRegistrars.emplace_back(new patches::CPlayerCountPatch(MAX_PLAYERS));
         m_PatchRegistrars.emplace_back(new patches::CDCCheckPatch());
+        m_PatchRegistrars.emplace_back(new patches::CTransitionsFixPatch());
 
         //Apply patches
         update_patches();
@@ -98,6 +100,10 @@ void CMPPatchPlugin::Unload() {
         delete m_EngineModule;
         delete m_MatchMakingModule;
         delete m_ServerModule;
+
+        //Clear the scratchpad
+        Msg("Clearing scratchpad... (%zu bytes)\n", m_ScratchPad.total_size());
+        m_ScratchPad.clear();
 
         Msg("Done!\n");
     } catch(const std::exception& e) {

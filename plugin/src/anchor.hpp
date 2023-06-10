@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <sstream>
 
 class CModule;
 
@@ -15,6 +16,7 @@ struct SAnchor {
     SAnchor(const CModule *module, size_t offset) : module(module), offset(offset) {}
 
     void *get_addr() const;
+    std::string debug_str() const;
 
     SAnchor operator +(size_t off) const { return SAnchor(module, offset + off); }
     SAnchor operator -(size_t off) const { return SAnchor(module, offset - off); }

@@ -14,10 +14,12 @@ class CSequentialByteSequence;
 
 class IByteSequence {
     public:
+        virtual ~IByteSequence() {}
+
         virtual size_t size() const = 0;
         virtual const uint8_t *buffer() const { return nullptr; }
 
-        virtual bool set_anchor(SAnchor anchor) { return true; }
+        virtual bool apply_anchor(SAnchor anchor) { return true; }
 
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
             const uint8_t *this_buf = buffer(), *seq_buf = seq.buffer();
@@ -33,7 +35,7 @@ class IByteSequence {
 
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const {
             const uint8_t *this_buf = buffer();
-            if(this_buf) return memcmp(this_buf + off, buf, size) == 0;
+            if(this_buf) return memcmp(this_buf + off, buf, size);
 
             for(size_t i = 0; i < size; i++) {
                 if((*this)[off + i] != buf[i]) return ((*this)[off + i] < buf[i]) ? -1 : 1;
@@ -45,28 +47,42 @@ class IByteSequence {
         virtual uint8_t operator [](size_t off) const = 0;
 };
 
+class CFillByteSequence : public IByteSequence {
+    public:
+        CFillByteSequence(int size, uint8_t fill) : m_Size(size), m_Fill(fill) {}
+
+        virtual size_t size() const { return m_Size; };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memset(buf, m_Fill, size); }
+        inline virtual uint8_t operator [](size_t off) const { return m_Fill; }
+
+    private:
+        int m_Size;
+        uint8_t m_Fill;
+};
+
 class CSequentialByteSequence : public IByteSequence {
     public:
-        CSequentialByteSequence() {}
-        CSequentialByteSequence(CSequentialByteSequence &seq);
+        CSequentialByteSequence() : m_Size(0) {}
+        CSequentialByteSequence(std::initializer_list<IByteSequence*> seqs) : m_Size(0) {
+            for(IByteSequence *seq : seqs) add_sequence(seq);
+        }
+        CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size) { m_Sequences = std::move(seq.m_Sequences); }
         ~CSequentialByteSequence() {}
 
-        void add_sequence(std::unique_ptr<IByteSequence> ptr) {
-            size_t size = ptr->size();
-            m_Sequences.emplace_back(m_Size, std::move(ptr));
+        void add_sequence(IByteSequence* ptr) {
+            m_Sequences.emplace_back(m_Size, std::unique_ptr<IByteSequence>(ptr));
             m_Size += ptr->size();
         }
 
         template<typename SeqType, typename... Args> SeqType& emplace_sequence(Args... args) {
-            auto ptr = std::unique_ptr<SeqType>(new SeqType(args...));
-            SeqType& seq = *ptr;
-            add_sequence(std::move(ptr));
-            return seq;
+            SeqType *seq = new SeqType(args...);
+            add_sequence(seq);
+            return *seq;
         }
 
         virtual size_t size() const { return m_Size; };
 
-        virtual bool set_anchor(SAnchor anchor);
+        virtual bool apply_anchor(SAnchor anchor);
 
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const;
@@ -106,6 +122,23 @@ class CArraySequence : public IByteSequence {
         size_t m_Size;
 };
 
+class CVectorSequence : public IByteSequence {
+    public:
+        CVectorSequence() {}
+        CVectorSequence(std::vector<uint8_t> data) : m_Data(data) {}
+        CVectorSequence(std::initializer_list<uint8_t> data) : m_Data(data) {}
+
+        inline void push_back(uint8_t byte) { m_Data.push_back(byte); }
+
+        virtual size_t size() const { return m_Data.size(); };
+        virtual const uint8_t *buffer() const { return m_Data.data(); };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memcpy(buf, m_Data.data()+off, size); }
+        virtual uint8_t operator [](size_t off) const { return m_Data[off]; }
+
+    private:
+        std::vector<uint8_t> m_Data;
+};
+
 class CHexSequence : public IByteSequence {
     public:
         CHexSequence(const char *hexstr, std::initializer_list<const void*> formats = std::initializer_list<const void*>());
@@ -142,7 +175,9 @@ class CRefInstructionSequence : public IByteSequence {
 
         virtual size_t size() const { return m_Opcode.size() + sizeof(size_t); };
 
-        virtual bool set_anchor(SAnchor anchor) {
+        virtual bool apply_anchor(SAnchor anchor) {
+            if(m_IsAnchored) throw std::runtime_error("CRefInstructionSequence is already anchored!");
+            m_IsAnchored = true;
             m_InstrAnchor = anchor;
             return true;
         }
@@ -152,7 +187,7 @@ class CRefInstructionSequence : public IByteSequence {
         }
 
         virtual uint8_t operator [](size_t off) const {
-            if(!m_IsAnchored) throw std::runtime_error("Can't access content of CRefInstructionSequence when not anchored");
+            if(!m_IsAnchored) throw std::runtime_error("Can't access content of CRefInstructionSequence when not anchored!");
             if(off < m_Opcode.size()) return m_Opcode[off];
 
             size_t rel = m_RefAnchor + size() - m_InstrAnchor;

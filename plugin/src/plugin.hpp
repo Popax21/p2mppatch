@@ -5,6 +5,7 @@
 #include <memory>
 #include "callbacks.hpp"
 #include "module.hpp"
+#include "scratchpad.hpp"
 #include "patch.hpp"
 
 class CMPPatchPlugin : public IServerPluginCallbacks {
@@ -12,6 +13,8 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         static const uint8_t MAX_PLAYERS = 0x20;
 
         void update_patches();
+
+        CScratchPad& scratchpad() { return m_ScratchPad; }
 
         const CModule& engine_module() const { return *m_EngineModule; }
         const CModule& matchmaking_module() const { return *m_MatchMakingModule; }
@@ -48,6 +51,7 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         virtual void OnEdictFreed(const edict_t *edict);
 
     private:
+        CScratchPad m_ScratchPad;
         CModule *m_EngineModule, *m_MatchMakingModule, *m_ServerModule;
         std::vector<std::unique_ptr<IPatchRegistrar>> m_PatchRegistrars;
         std::vector<std::unique_ptr<CPatch>> m_Patches;
