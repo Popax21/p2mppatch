@@ -83,7 +83,7 @@ void CScratchPad::clear() {
 }
 
 void CScratchPad::free_entry(const SSeqEntry& entry) {
-    DevMsg("Freeing %d byte scratchpad entry in page %d [%p]\n", seq_size, page_idx, seq_anchor.get_addr());
+    DevMsg("Freeing %d byte scratchpad entry in page %d [%p]\n", entry.m_SeqSize, entry.m_PageIdx, entry.m_Anchor.get_addr());
 
     m_TotalSize -= entry.m_SeqSize;
     if(--m_PageRefCnts[entry.m_PageIdx] <= 0) {
