@@ -3,8 +3,8 @@
 
 #include <vector>
 #include <memory>
-#include <tier1/convar.h>
-#include "callbacks.hpp"
+#include <engine/iserverplugin.h>
+#include <tier0/valve_minmax_off.h>
 #include "module.hpp"
 #include "scratchpad.hpp"
 #include "patch.hpp"

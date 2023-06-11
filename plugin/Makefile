@@ -8,13 +8,13 @@ CXX := $(STEAM_RUNTIME_PATH)/bin/g++
 
 all: $(PLUGIN)
 
-SRC := plugin.cpp byteseq.cpp module.cpp anchor.cpp sufarr.cpp scratchpad.cpp patch.cpp detour.cpp patches/transitions_fix.cpp
+SRC := compat.cpp plugin.cpp byteseq.cpp module.cpp anchor.cpp sufarr.cpp scratchpad.cpp patch.cpp detour.cpp patches/transitions_fix.cpp
 SRC := $(addprefix src/, $(SRC))
 OBJ := $(addprefix obj/, $(SRC:.cpp=.o))
 
 SDKOBJ := memoverride.o
 SDKOBJ := $(addprefix obj/sdk/, $(SDKOBJ))
-SDKDYNLIB := tier0
+SDKDYNLIB := tier0 vstdlib
 SDKSTATLIB := tier1.a mathlib.a tier2.a
 SDKSTATLIB := $(addprefix $(SDK)/mp/src/lib/public/linux32/, $(SDKSTATLIB))
 
@@ -35,7 +35,7 @@ obj/sdk/memoverride.o: $(SDK)/mp/src/public/tier0/memoverride.cpp
 	$(CXX) $(CFLAGS) -c -o "$@" "$<"
 
 $(PLUGIN): $(OBJ) $(SDKOBJ)
-	$(CXX) $(LFLAGS) -o "$@" $^ $(addprefix -l,$(SDKDYNLIB)) $(SDKSTATLIB)
+	$(CXX) $(LFLAGS) -o "$@" $^ $(SDKSTATLIB) $(addprefix -l,$(SDKDYNLIB))
 
 .PHONY: clean
 clean:

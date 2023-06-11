@@ -3,8 +3,9 @@
 #include <tier0/platform.h>
 #include <tier1/tier1.h>
 #include <tier2/tier2.h>
-
+#include <eiface.h>
 #include <tier0/valve_minmax_off.h>
+
 #include "plugin.hpp"
 #include "module.hpp"
 #include "patch.hpp"
@@ -13,10 +14,6 @@
 #include "patches/dc_check.hpp"
 #include "patches/transitions_fix.hpp"
 #include "patches/env_fade.hpp"
-
-struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
-    return localtime_r(timep, result);
-}
 
 void CMPPatchPlugin::update_patches() {
     //Prepare modules
