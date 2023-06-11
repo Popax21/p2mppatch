@@ -28,7 +28,7 @@ void CMPPatchPlugin::update_patches() {
     //Delete old patches
     if(m_Patches.size() > 0) {
         Msg("Clearing old patches...\n");
-        m_Patches.clear();
+        clear_patches();
     }
 
     //Register patches
@@ -40,6 +40,12 @@ void CMPPatchPlugin::update_patches() {
     //Apply patches
     Msg("Applying patches...\n");
     for(std::unique_ptr<CPatch>& patch : m_Patches) patch->apply();
+
+    //Invoke post-apply hooks
+    Msg("Invoking post-apply hooks...\n");
+    for(const std::unique_ptr<IPatchRegistrar>& reg : m_PatchRegistrars) {
+        reg->after_patch_status_change(*this, true);
+    }
 
     //Finalize modules
     Msg("Finalizing modules...\n");
@@ -86,8 +92,7 @@ void CMPPatchPlugin::Unload() {
         m_MatchMakingModule->unprotect();
         m_ServerModule->unprotect();
 
-        for(std::unique_ptr<CPatch>& patch : m_Patches) patch->revert();
-        m_Patches.clear();
+        clear_patches();
 
         m_EngineModule->reprotect();
         m_MatchMakingModule->reprotect();
@@ -114,6 +119,18 @@ void CMPPatchPlugin::Unload() {
 
     DisconnectTier1Libraries();
     DisconnectTier2Libraries();
+}
+
+void CMPPatchPlugin::clear_patches() {
+    //Revert patches
+    for(std::unique_ptr<CPatch>& patch : m_Patches) patch->revert();
+    m_Patches.clear();
+
+    //Invoke post-revert hooks
+    Msg("Invoking post-revert hooks...\n");
+        for(const std::unique_ptr<IPatchRegistrar>& reg : m_PatchRegistrars) {
+        reg->after_patch_status_change(*this, false);
+    }
 }
 
 void CMPPatchPlugin::Pause() {}

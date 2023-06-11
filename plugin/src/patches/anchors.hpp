@@ -63,6 +63,14 @@ namespace patches {
         namespace CMatchTitleGameSettingsMgr {
             const SFuncAnchor InitializeGameSettings("57 56 53 8b 5c 24 14 8b 74 24 18 83 ec 04");
         }
+
+        //>>>>> engine anchors <<<<<
+
+        const SFuncAnchor SV_Frame("85 c0 74 14 89 f1 84 c9 74 0e 8b 10 83 ec 08 6a 01 50", 0x1f); //Only used to find the global sv variable
+
+        namespace CGameServer {
+            const SFuncAnchor InitMaxClients("8b 5c 24 20 c7 44 24 04 01 00 00 00 c7 44 24 08 40 00 00 00", 0xa);
+        }
     }
 }
 

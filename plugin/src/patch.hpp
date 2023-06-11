@@ -29,6 +29,7 @@ class IPatchRegistrar {
     public:
         virtual const char *name() const = 0;
         virtual void register_patches(CMPPatchPlugin& plugin) = 0;
+        virtual void after_patch_status_change(CMPPatchPlugin& plugin, bool applied) {}
 };
 
 #endif

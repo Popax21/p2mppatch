@@ -56,6 +56,8 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         CModule *m_EngineModule, *m_MatchMakingModule, *m_ServerModule;
         std::vector<std::unique_ptr<IPatchRegistrar>> m_PatchRegistrars;
         std::vector<std::unique_ptr<CPatch>> m_Patches;
+
+        void clear_patches();
 };
 
 #endif
