@@ -80,6 +80,12 @@ namespace patches {
         namespace CGameServer {
             const SFuncAnchor InitMaxClients("8b 5c 24 20 c7 44 24 04 01 00 00 00 c7 44 24 08 40 00 00 00", 0xa);
         }
+
+        namespace KeyValues {
+            //Present in every lib as part of the static tier0 lib, but take it from the engine
+            //Don't just use the SDK's tier0, as it might have a different layout
+            const SFuncAnchor GetInt("83 c4 10 85 c0 74 1a 0f b6 50 10 80 fa 05 74 59 7f 17 80 fa 01 74 2a", 0x17);
+        }
     }
 }
 

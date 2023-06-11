@@ -87,12 +87,10 @@ namespace patches {
             static IServer *glob_sv;
             static void **ptr_g_pMatchFramework;
 
-            static void *(*UTIL_PlayerByIndex)(int);
+            static void *(*UTIL_PlayerByIndex)(int idx);
+            static int (*KeyValues_GetInt)(void *kv, const char *keyName, int defaultValue);
             static void (*CPortalMPGameRules_SendAllMapCompleteData)(void *rules);
             static void (*CPortalMPGameRules_StartPlayerTransitionThinks)(void *rules);
-            static uint64_t (*CBaseEntity_ThinkSet)(void *ent, uint64_t func, float flNextThinkTime, const char *szContext); //The function pointers are 64 bit for some reason
-            static void (*CBaseEntity_SetNextThink)(void *ent, float nextThinkTime, const char *szContext);
-            static void (*CPortal_Player_PlayerTransitionCompleteThink)(void *player);
 
             static uint16_t& get_rules_slot_list(void *rules);
             static bool is_everyone_ready(void *rules, void *ignore_player = nullptr);

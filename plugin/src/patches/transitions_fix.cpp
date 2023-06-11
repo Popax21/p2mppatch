@@ -18,11 +18,9 @@ IServer *CTransitionsFixPatch::glob_sv;
 void **CTransitionsFixPatch::ptr_g_pMatchFramework;
 
 void *(*CTransitionsFixPatch::UTIL_PlayerByIndex)(int);
-void (*CTransitionsFixPatch::CPortalMPGameRules_SendAllMapCompleteData)(void *rules);
-void (*CTransitionsFixPatch::CPortalMPGameRules_StartPlayerTransitionThinks)(void *rules);
-uint64_t (*CTransitionsFixPatch::CBaseEntity_ThinkSet)(void *ent, uint64_t func, float flNextThinkTime, const char *szContext);
-void (*CTransitionsFixPatch::CBaseEntity_SetNextThink)(void *ent, float nextThinkTime, const char *szContext);
-void (*CTransitionsFixPatch::CPortal_Player_PlayerTransitionCompleteThink)(void *player);
+int (*CTransitionsFixPatch::KeyValues_GetInt)(void*, const char*, int);
+void (*CTransitionsFixPatch::CPortalMPGameRules_SendAllMapCompleteData)(void*);
+void (*CTransitionsFixPatch::CPortalMPGameRules_StartPlayerTransitionThinks)(void*);
 
 void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     //Find CPortalMPGameRules::CPortalMPGameRules and set m_bMapNamesLoaded to true by default
@@ -48,11 +46,10 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     glob_sv = (IServer*) get_engine_global_CBaseServer(plugin.engine_module());
     ptr_g_pMatchFramework = get_server_global_g_pMatchFramework(plugin.server_module());
 
+    UTIL_PlayerByIndex = (void *(*)(int)) PATCH_FUNC_ANCHOR(plugin.server_module(), UTIL_PlayerByIndex).get_addr();
+    KeyValues_GetInt = (int (*)(void*, const char*, int)) PATCH_FUNC_ANCHOR(plugin.engine_module(), KeyValues::GetInt).get_addr();
     CPortalMPGameRules_SendAllMapCompleteData = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::SendAllMapCompleteData).get_addr();
     CPortalMPGameRules_StartPlayerTransitionThinks = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::StartPlayerTransitionThinks).get_addr();
-    CBaseEntity_ThinkSet = (uint64_t (*)(void*, uint64_t, float, const char*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CBaseEntity::ThinkSet).get_addr();
-    CBaseEntity_SetNextThink = (void (*)(void*, float, const char*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CBaseEntity::SetNextThink).get_addr();
-    CPortal_Player_PlayerTransitionCompleteThink = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortal_Player::PlayerTransitionCompleteThink).get_addr();
 
     // - CPortalMPGameRules::~CPortalMPGameRules: detour to clear the connected list
     plugin.register_patch<CPatch>(CPortalMPGameRules_destr_CPortalMPGameRules + 0x5f, new SEQ_HEX("8b 9e a8 1a 00 00"),
@@ -68,7 +65,7 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
         new SEQ_HEX("85 d2") //test edx, edx
     ));
 
-    // // - CPortalMPGameRules::ClientDisconnected: detour to remove client from connected list
+    // - CPortalMPGameRules::ClientDisconnected: detour to remove client from connected list
     //Replace the bIsSSCredits check to make room for the detour (it's no longer used because of the disconnect check patch anyway)
     plugin.register_patch<CPatch>(CPortalMPGameRules_ClientDisconnected + 0x69, new SEQ_MASKED_HEX("8b 0d ?? ?? ?? ?? 85 c9 74 0d e8 ?? ?? ?? ?? 84 c0 0f 85 b0 00 00 00"), new SEQ_SEQ(
         new SEQ_HEX("8b 4c 24 0c"), //mov ecx, [<this arg>]
@@ -116,9 +113,9 @@ bool CTransitionsFixPatch::is_everyone_ready(void *rules, void *ignore_player) {
     if(g_pMatchFramework) {
         void *match_session = PATCH_VTAB_FUNC(g_pMatchFramework, IMatchFramework::GetMatchSession)(g_pMatchFramework);
         if(match_session) {
-            KeyValues *session_settings = PATCH_VTAB_FUNC(match_session, IMatchSession::GetSessionSettings)(match_session);
+            void *session_settings = PATCH_VTAB_FUNC(match_session, IMatchSession::GetSessionSettings)(match_session);
             if(session_settings) {
-                player_count = session_settings->GetInt("members/numPlayers", -1);
+                player_count = KeyValues_GetInt(session_settings, "members/numPlayers", -1);
                 DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings()->GetInt(\"members/numPlayers\") = %d\n", player_count);
             } else DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings() = nullptr\n");
         } else DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession() = nullptr\n");
@@ -212,10 +209,9 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_SetMapCompleteD
         *ptr_shouldAbort = player_slots.list_contains_player(get_rules_slot_list(rules), pPlayer);
         DevMsg(*ptr_shouldAbort ? " -> ready list contains the player, aborting...\n" : " -> ready list does not contain the player, continuing...\n");
     } else {
-        //We have already started, so just immediately spawn the player
-        Msg("P2MPPatch | Ending transition for late CPortal_Player %p...\n", pPlayer);
-        CBaseEntity_ThinkSet(pPlayer, (uintptr_t) CPortal_Player_PlayerTransitionCompleteThink, 0, NULL);
-        CBaseEntity_SetNextThink(pPlayer, gpGlobals->curtime + 1, NULL);
+        //We have already started, so just send the map complete data again for the player
+        Msg("P2MPPatch | Sending map complete data for late CPortal_Player %p...\n", pPlayer);
+        CPortalMPGameRules_SendAllMapCompleteData(rules);
     }
 }
 
