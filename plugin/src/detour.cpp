@@ -5,8 +5,8 @@
 
 const CDetour::SArgument CDetour::SArgument::reg_eax(true, 7 - 0);
 const CDetour::SArgument CDetour::SArgument::reg_ebx(true, 7 - 3);
-const CDetour::SArgument CDetour::SArgument::reg_ecx(true, 7 - 2);
-const CDetour::SArgument CDetour::SArgument::reg_edx(true, 7 - 1);
+const CDetour::SArgument CDetour::SArgument::reg_ecx(true, 7 - 1);
+const CDetour::SArgument CDetour::SArgument::reg_edx(true, 7 - 2);
 const CDetour::SArgument CDetour::SArgument::reg_esi(true, 7 - 6);
 const CDetour::SArgument CDetour::SArgument::reg_edi(true, 7 - 7);
 

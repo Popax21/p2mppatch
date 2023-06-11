@@ -2,6 +2,7 @@
 #define H_P2MPPATCH_PATCHES_ANCHORS
 
 #include <tier0/dbg.h>
+#include <tier0/valve_minmax_off.h>
 #include "byteseq.hpp"
 #include "patch.hpp"
 
@@ -22,7 +23,6 @@ namespace patches {
 
         //>>>>> server anchors <<<<<
 
-        const SFuncAnchor GetNumPlayersConnected("8b 10 83 ec 0c 50 ff 92 58 01 00 00 83 c4 10 3c 01 83 de ff", 0x38);
         const SFuncAnchor UTIL_PlayerByIndex("39 50 14 7c 2e 8b 40 58 85 c0 74 22 c1 e2 04 01 d0 f6 00 02", 0xd);
 
         const SFuncAnchor FUNC_numSlots_adj("83 ec 0c 8b 10 50 ff 52 10 83 c4 10 89 c7 85 c0 74 12", 0x75);
@@ -43,6 +43,11 @@ namespace patches {
             const SFuncAnchor StartPlayerTransitionThinks("83 ec 08 be 41 08 00 00 31 ff 6a 00 6a 00 57 56 50 8d 44 24 24 50", 0x36);
         }
 
+        namespace CBaseEntity {
+            const SFuncAnchor ThinkSet("55 57 56 53 83 ec 1c 8b 74 24 44 f3 0f 7e 44 24 38");
+            const SFuncAnchor SetNextThink("f3 0f 10 44 24 34 8b 6c 24 30 0f 2e c1 8b 74 24 38", 0x7);
+        }
+
         namespace CPortal_Player {
             const SFuncAnchor Spawn("8b 03 89 1c 24 ff 90 3c 08 00 00 83 c4 10 80 bb 10 0b 00 00 00", 0x62);
 
@@ -51,6 +56,10 @@ namespace patches {
             const SFuncAnchor OnFullyConnected("8b 5c 24 4c 8b 10 50 ff 92 88 00 00 00 83 c4 10 84 c0", 0xc);
 
             const SFuncAnchor PlayerTransitionCompleteThink("8b 5c 24 28 8b 10 68 00 00 f8 3f 6a 00", 0xa);
+        }
+
+        namespace CProp_Portal {
+            const SFuncAnchor Spawn("53 83 ec 14 8b 5c 24 1c 8b 03 53 ff 50 68 89 1c 24"); //Only used to find g_pMatchFramework 
         }
 
         namespace CEnvFade {

@@ -56,6 +56,12 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
     ConnectTier1Libraries(&interfaceFactory, 1);
     ConnectTier2Libraries(&interfaceFactory, 1);
 
+    //Get interfaces
+    if(!(m_PlayerInfoManager = (IPlayerInfoManager*) gameServerFactory(INTERFACEVERSION_PLAYERINFOMANAGER, NULL))) {
+        Warning("Couldn't obtain IPlayerInfoManager [%s] interface!", INTERFACEVERSION_PLAYERINFOMANAGER);
+        return false;
+    } else DevMsg("IPlayerInfoManager: %p\n", m_PlayerInfoManager);
+
     try {
         //Prepare modules
         Msg("Creating modules...\n");
@@ -85,15 +91,15 @@ void CMPPatchPlugin::Unload() {
         //Delete patches
         Msg("Deleting patches...\n");
 
-        m_EngineModule->unprotect();
-        m_MatchMakingModule->unprotect();
-        m_ServerModule->unprotect();
+        if(m_EngineModule) m_EngineModule->unprotect();
+        if(m_MatchMakingModule) m_MatchMakingModule->unprotect();
+        if(m_ServerModule) m_ServerModule->unprotect();
 
         clear_patches();
 
-        m_EngineModule->reprotect();
-        m_MatchMakingModule->reprotect();
-        m_ServerModule->reprotect();
+        if(m_EngineModule) m_EngineModule->reprotect();
+        if(m_MatchMakingModule) m_MatchMakingModule->reprotect();
+        if(m_ServerModule) m_ServerModule->reprotect();
 
         //Delete registrars
         Msg("Deleting registrars...\n");
@@ -105,8 +111,7 @@ void CMPPatchPlugin::Unload() {
         delete m_MatchMakingModule;
         delete m_ServerModule;
 
-        //Clear the scratchpad
-        Msg("Clearing scratchpad...\n");
+        //Clear the scratchpad in case something still uses it
         m_ScratchPad.clear();
 
         Msg("Done!\n");
@@ -125,7 +130,7 @@ void CMPPatchPlugin::clear_patches() {
 
     //Invoke post-revert hooks
     Msg("Invoking post-revert hooks...\n");
-        for(const std::unique_ptr<IPatchRegistrar>& reg : m_PatchRegistrars) {
+    for(const std::unique_ptr<IPatchRegistrar>& reg : m_PatchRegistrars) {
         reg->after_patch_status_change(*this, false);
     }
 }

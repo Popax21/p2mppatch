@@ -1,16 +1,28 @@
 #include <tier0/dbg.h>
+#include <tier1/KeyValues.h>
+#include <tier0/valve_minmax_off.h>
+#include <iserver.h>
+
 #include "byteseq.hpp"
 #include "transitions_fix.hpp"
 #include "anchors.hpp"
+#include "vtab.hpp"
+#include "utils.hpp"
 
 using namespace patches;
 
 CTransitionsFixPatch::SPlayerSlots CTransitionsFixPatch::player_slots;
 
+CGlobalVars *CTransitionsFixPatch::gpGlobals;
+IServer *CTransitionsFixPatch::glob_sv;
+void **CTransitionsFixPatch::ptr_g_pMatchFramework;
+
 void *(*CTransitionsFixPatch::UTIL_PlayerByIndex)(int);
-int (*CTransitionsFixPatch::GetNumPlayersConnected)();
 void (*CTransitionsFixPatch::CPortalMPGameRules_SendAllMapCompleteData)(void *rules);
 void (*CTransitionsFixPatch::CPortalMPGameRules_StartPlayerTransitionThinks)(void *rules);
+uint64_t (*CTransitionsFixPatch::CBaseEntity_ThinkSet)(void *ent, uint64_t func, float flNextThinkTime, const char *szContext);
+void (*CTransitionsFixPatch::CBaseEntity_SetNextThink)(void *ent, float nextThinkTime, const char *szContext);
+void (*CTransitionsFixPatch::CPortal_Player_PlayerTransitionCompleteThink)(void *player);
 
 void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     //Find CPortalMPGameRules::CPortalMPGameRules and set m_bMapNamesLoaded to true by default
@@ -31,10 +43,16 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     SAnchor CPortal_Player_OnFullyConnected = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortal_Player::OnFullyConnected);
     //CPortal_Player::PlayerTransitionCompleteThink has already been patched, so it is no longer accessing m_bDataReceived
 
-    UTIL_PlayerByIndex = (void *(*)(int)) PATCH_FUNC_ANCHOR(plugin.server_module(), UTIL_PlayerByIndex).get_addr();
-    GetNumPlayersConnected = (int (*)()) PATCH_FUNC_ANCHOR(plugin.server_module(), GetNumPlayersConnected).get_addr();
+    // - find functions/globals we need to link to
+    gpGlobals = plugin.get_globals();
+    glob_sv = (IServer*) get_engine_global_CBaseServer(plugin.engine_module());
+    ptr_g_pMatchFramework = get_server_global_g_pMatchFramework(plugin.server_module());
+
     CPortalMPGameRules_SendAllMapCompleteData = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::SendAllMapCompleteData).get_addr();
     CPortalMPGameRules_StartPlayerTransitionThinks = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::StartPlayerTransitionThinks).get_addr();
+    CBaseEntity_ThinkSet = (uint64_t (*)(void*, uint64_t, float, const char*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CBaseEntity::ThinkSet).get_addr();
+    CBaseEntity_SetNextThink = (void (*)(void*, float, const char*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CBaseEntity::SetNextThink).get_addr();
+    CPortal_Player_PlayerTransitionCompleteThink = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortal_Player::PlayerTransitionCompleteThink).get_addr();
 
     // - CPortalMPGameRules::~CPortalMPGameRules: detour to clear the connected list
     plugin.register_patch<CPatch>(CPortalMPGameRules_destr_CPortalMPGameRules + 0x5f, new SEQ_HEX("8b 9e a8 1a 00 00"),
@@ -50,7 +68,7 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
         new SEQ_HEX("85 d2") //test edx, edx
     ));
 
-    // - CPortalMPGameRules::ClientDisconnected: detour to remove client from connected list
+    // // - CPortalMPGameRules::ClientDisconnected: detour to remove client from connected list
     //Replace the bIsSSCredits check to make room for the detour (it's no longer used because of the disconnect check patch anyway)
     plugin.register_patch<CPatch>(CPortalMPGameRules_ClientDisconnected + 0x69, new SEQ_MASKED_HEX("8b 0d ?? ?? ?? ?? 85 c9 74 0d e8 ?? ?? ?? ?? 84 c0 0f 85 b0 00 00 00"), new SEQ_SEQ(
         new SEQ_HEX("8b 4c 24 0c"), //mov ecx, [<this arg>]
@@ -89,12 +107,33 @@ uint16_t& CTransitionsFixPatch::get_rules_slot_list(void *rules) {
 }
 
 bool CTransitionsFixPatch::is_everyone_ready(void *rules, void *ignore_player) {
-    int player_count = GetNumPlayersConnected();
-    int list_player_count = player_slots.num_players_in_list(get_rules_slot_list(rules));
+    if(get_rules_slot_list(rules) == SPlayerSlots::INV_SLOT) return true;
+
+    //Determine the target player count
+    int player_count = -1;
+
+    void *g_pMatchFramework = *ptr_g_pMatchFramework;
+    if(g_pMatchFramework) {
+        void *match_session = PATCH_VTAB_FUNC(g_pMatchFramework, IMatchFramework::GetMatchSession)(g_pMatchFramework);
+        if(match_session) {
+            KeyValues *session_settings = PATCH_VTAB_FUNC(match_session, IMatchSession::GetSessionSettings)(match_session);
+            if(session_settings) {
+                player_count = session_settings->GetInt("members/numPlayers", -1);
+                DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings()->GetInt(\"members/numPlayers\") = %d\n", player_count);
+            } else DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings() = nullptr\n");
+        } else DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession() = nullptr\n");
+    } else DevMsg("CTransitionsFixPatch | g_pMatchFramework = nullptr\n");
+
+    if(player_count < 0) {
+        fallback:;
+        //Fallback to the client count
+        player_count = glob_sv->GetNumClients() - glob_sv->GetNumProxies();
+        Msg("P2MPPatch | Matchmaking session player count not available, falling back to GetNumClients() - GetNumProxies()\n");
+    }
 
     if(ignore_player) {
         //Check if the player appears in the client list
-        for(int i = 1; i <= MAXCLIENTS; i++) {
+        for(int i = 1; i <= gpGlobals->maxClients; i++) {
             if(UTIL_PlayerByIndex(i) == ignore_player) {
                 DevMsg("CTransitionsFixPatch | Ignoring CPortal_Player %p for CPortalMPGameRules %p ready check\n", ignore_player, rules);
                 player_count--;
@@ -103,13 +142,18 @@ bool CTransitionsFixPatch::is_everyone_ready(void *rules, void *ignore_player) {
         }
     }
 
-    DevMsg("CTransitionsFixPatch | CPortalMPGameRules %p ready check: %d / %d players in list / total\n", rules, list_player_count, player_count);
+    //Check if all players are in the ready list
+    int list_player_count = player_slots.num_players_in_list(get_rules_slot_list(rules));
+
+    Msg("P2MPPatch | CPortalMPGameRules %p ready check: %d / %d players in list / total\n", rules, list_player_count, player_count);
     return list_player_count >= player_count;
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_destr_CPortalMPGameRules(void **ptr_rules) {
     void *rules = *ptr_rules;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::~CPortalMPGameRules | this=%p\n", rules);
+
+    if(get_rules_slot_list(rules) == SPlayerSlots::INV_SLOT) return;
 
     //Free the slot list
     Msg("P2MPPatch | Freeing ready player list for CPortalMPGameRules %p\n", ptr_rules);
@@ -120,6 +164,8 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientCommandKe
     void *rules = *ptr_rules;
     void *pPlayer = *ptr_pPlayer;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::ClientCommandKeyValues A | this=%p pPlayer=%p\n", rules, pPlayer);
+
+    if(get_rules_slot_list(rules) == SPlayerSlots::INV_SLOT) return;
 
     //Add the player to the slot list
     if(!player_slots.list_contains_player(get_rules_slot_list(rules), pPlayer)) {
@@ -133,13 +179,19 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientCommandKe
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::ClientCommandKeyValues B | this=%p\n", rules);
 
     *ptr_everyoneReady = is_everyone_ready(rules);
-    if(*ptr_everyoneReady) Msg("P2MPPatch | All players ready, ending transition...\n");
+    if(*ptr_everyoneReady && get_rules_slot_list(rules) != SPlayerSlots::INV_SLOT) {
+        Msg("P2MPPatch | All players ready, ending transition...\n");
+        player_slots.free_slot_list(get_rules_slot_list(rules));
+        get_rules_slot_list(rules) = SPlayerSlots::INV_SLOT;
+    }
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientDisconnected(void **ptr_rules, void **ptr_pPlayer) {
     void *rules = *ptr_rules;
     void *pPlayer = *ptr_pPlayer;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::ClientDisconnected | this=%p pPlayer=%p\n", rules, pPlayer);
+
+    if(!pPlayer || get_rules_slot_list(rules) == SPlayerSlots::INV_SLOT) return;
 
     //Remove the player from the slot list
     if(player_slots.remove_player_from_list(get_rules_slot_list(rules), pPlayer)) {
@@ -156,8 +208,15 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_SetMapCompleteD
     void *pPlayer = *ptr_pPlayer;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::SetMapCompleteData | this=%p pPlayer=%p\n", rules, pPlayer);
 
-    *ptr_shouldAbort = player_slots.list_contains_player(get_rules_slot_list(rules), pPlayer);
-    DevMsg(*ptr_shouldAbort ? " -> ready list contains the player, aborting...\n" : " -> ready list does not contain the player, continuing...\n");
+    if(get_rules_slot_list(rules) != SPlayerSlots::INV_SLOT) {
+        *ptr_shouldAbort = player_slots.list_contains_player(get_rules_slot_list(rules), pPlayer);
+        DevMsg(*ptr_shouldAbort ? " -> ready list contains the player, aborting...\n" : " -> ready list does not contain the player, continuing...\n");
+    } else {
+        //We have already started, so just immediately spawn the player
+        Msg("P2MPPatch | Ending transition for late CPortal_Player %p...\n", pPlayer);
+        CBaseEntity_ThinkSet(pPlayer, (uintptr_t) CPortal_Player_PlayerTransitionCompleteThink, 0, NULL);
+        CBaseEntity_SetNextThink(pPlayer, gpGlobals->curtime + 1, NULL);
+    }
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortal_Player_Spawn(void **ptr_rules, int *ptr_everyoneReady) {

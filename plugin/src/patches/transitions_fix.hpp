@@ -6,6 +6,8 @@
 #include "patch.hpp"
 #include "detour.hpp"
 
+class IServer;
+
 namespace patches {
     class CTransitionsFixPatch : public IPatchRegistrar {
         public:
@@ -15,7 +17,8 @@ namespace patches {
 
         private:
             static struct SPlayerSlots {
-                static const int MAX_SLOT = 65535;
+                static const int MAX_SLOT = 65534, INV_SLOT = 65535;
+
                 struct {
                     uint16_t next_slot;
                     void *player;
@@ -71,20 +74,25 @@ namespace patches {
                 void free_slot_list(uint16_t slot_list) {
                     for(uint16_t slot = slot_list; slot > 0;) {
                         uint16_t next_slot = slots[slot].next_slot;
-                        slots[slot_list].next_slot = free_slots_head;
+                        slots[slot].next_slot = free_slots_head;
                         free_slots_head = slot;
                         slot = next_slot;
                     }
                 }
             } player_slots;
 
-            static const int MAXCLIENTS = 1024;
             static const int OFF_CPortalMPGameRules_m_bDataReceived = 0x1c7d;
 
+            static CGlobalVars *gpGlobals;
+            static IServer *glob_sv;
+            static void **ptr_g_pMatchFramework;
+
             static void *(*UTIL_PlayerByIndex)(int);
-            static int (*GetNumPlayersConnected)();
             static void (*CPortalMPGameRules_SendAllMapCompleteData)(void *rules);
             static void (*CPortalMPGameRules_StartPlayerTransitionThinks)(void *rules);
+            static uint64_t (*CBaseEntity_ThinkSet)(void *ent, uint64_t func, float flNextThinkTime, const char *szContext); //The function pointers are 64 bit for some reason
+            static void (*CBaseEntity_SetNextThink)(void *ent, float nextThinkTime, const char *szContext);
+            static void (*CPortal_Player_PlayerTransitionCompleteThink)(void *player);
 
             static uint16_t& get_rules_slot_list(void *rules);
             static bool is_everyone_ready(void *rules, void *ignore_player = nullptr);

@@ -5,6 +5,7 @@
 #include <memory>
 #include <engine/iserverplugin.h>
 #include <tier0/valve_minmax_off.h>
+#include <game/server/iplayerinfo.h>
 #include "module.hpp"
 #include "scratchpad.hpp"
 #include "patch.hpp"
@@ -13,6 +14,9 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
     public:
         static const uint8_t MAX_PLAYERS = 0x20;
 
+        CGlobalVars *get_globals() const { return m_PlayerInfoManager->GetGlobalVars(); }
+
+        //Patches
         void update_patches();
 
         CScratchPad& scratchpad() { return m_ScratchPad; }
@@ -52,6 +56,8 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         virtual void OnEdictFreed(const edict_t *edict);
 
     private:
+        IPlayerInfoManager *m_PlayerInfoManager;
+
         CScratchPad m_ScratchPad;
         CModule *m_EngineModule, *m_MatchMakingModule, *m_ServerModule;
         std::vector<std::unique_ptr<IPatchRegistrar>> m_PatchRegistrars;
