@@ -1,6 +1,10 @@
 #ifndef H_P2MPPATCH_PATCHES_TRANSITIONS_FIX
 #define H_P2MPPATCH_PATCHES_TRANSITIONS_FIX
 
+#include <tier0/valve_minmax_off.h>
+#include <iserver.h>
+
+#include <set>
 #include "plugin.hpp"
 #include "byteseq.hpp"
 #include "patch.hpp"
@@ -16,71 +20,6 @@ namespace patches {
             virtual void register_patches(CMPPatchPlugin& plugin);
 
         private:
-            static struct SPlayerSlots {
-                static const int MAX_SLOT = 65534, INV_SLOT = 65535;
-
-                struct {
-                    uint16_t next_slot;
-                    void *player;
-                } slots[MAX_SLOT+1];
-                uint16_t free_slots_head;
-
-                SPlayerSlots() {
-                    free_slots_head = MAX_SLOT;
-                    for(int i = 1; i <= MAX_SLOT; i++) {
-                        slots[i].next_slot = i-1;
-                    }
-                }
-
-                void add_player_to_list(uint16_t& slot_list, void *player) {
-                    if(free_slots_head <= 0) abort();
-
-                    int player_slot = free_slots_head;
-                    free_slots_head = slots[player_slot].next_slot;
-
-                    slots[player_slot].next_slot = slot_list;
-                    slots[player_slot].player = player;
-                    slot_list = player_slot;
-                }
-
-                bool remove_player_from_list(uint16_t& slot_list, void *player) {
-                    uint16_t *slot_ptr = &slot_list;
-                    while(*slot_ptr > 0) {
-                        uint16_t slot = *slot_ptr;
-                        if(slots[slot].player == player) {
-                            *slot_ptr = slots[slot].next_slot;
-                            slots[slot].next_slot = free_slots_head;
-                            free_slots_head = slot;
-                            return true;
-                        }
-                        slot_ptr = &slots[slot].next_slot;
-                    }
-                    return false;
-                }
-
-                bool list_contains_player(uint16_t slot_list, void *player) const {
-                    for(uint16_t slot = slot_list; slot > 0; slot = slots[slot].next_slot) {
-                        if(slots[slot].player == player) return true;
-                    }
-                    return false;
-                }
-
-                int num_players_in_list(uint16_t slot_list) const {
-                    int count = 0;
-                    for(uint16_t slot = slot_list; slot > 0; slot = slots[slot].next_slot) count++;
-                    return count;
-                }
-
-                void free_slot_list(uint16_t slot_list) {
-                    for(uint16_t slot = slot_list; slot > 0;) {
-                        uint16_t next_slot = slots[slot].next_slot;
-                        slots[slot].next_slot = free_slots_head;
-                        free_slots_head = slot;
-                        slot = next_slot;
-                    }
-                }
-            } player_slots;
-
             static const int OFF_CPortalMPGameRules_m_bDataReceived = 0x1c7d;
 
             static CGlobalVars *gpGlobals;
@@ -92,9 +31,30 @@ namespace patches {
             static void (*CPortalMPGameRules_SendAllMapCompleteData)(void *rules);
             static void (*CPortalMPGameRules_StartPlayerTransitionThinks)(void *rules);
 
-            static uint16_t& get_rules_slot_list(void *rules);
-            static bool is_everyone_ready(void *rules, void *ignore_player = nullptr);
+            struct SReadyTracker {
+                bool is_ready;
+                int req_player_cnt;
+                std::set<void*> ready_players;
 
+                SReadyTracker() : is_ready(false), req_player_cnt(-1) {}
+
+                void init_match_req_player_count();
+
+                int get_req_players() const {
+                    if(req_player_cnt >= 0) return req_player_cnt;
+                    return glob_sv->GetNumClients() - glob_sv->GetNumProxies();
+                }
+
+                bool is_everyone_ready() const;
+            };
+
+            static const int NUM_TRACKER_SLOTS = 65536;
+            static SReadyTracker *tracker_slots[NUM_TRACKER_SLOTS];
+
+            static uint16_t& get_rules_ready_tracker_slot(void *rules) { return *(uint16_t*) ((uint8_t*) rules + OFF_CPortalMPGameRules_m_bDataReceived); }
+            static SReadyTracker *get_rules_ready_tracker(void *rules) { return tracker_slots[get_rules_ready_tracker_slot(rules)]; }
+
+            DETOUR_FUNC static void detour_CPortalMPGameRules_CPortalMPGameRules(void **ptr_rules);
             DETOUR_FUNC static void detour_CPortalMPGameRules_destr_CPortalMPGameRules(void **ptr_rules);
             DETOUR_FUNC static void detour_CPortalMPGameRules_ClientCommandKeyValues_A(void **ptr_rules, void **ptr_pPlayer);
             DETOUR_FUNC static void detour_CPortalMPGameRules_ClientCommandKeyValues_B(void **ptr_rules, int *ptr_everyoneReady);

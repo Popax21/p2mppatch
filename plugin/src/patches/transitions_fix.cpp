@@ -11,7 +11,7 @@
 
 using namespace patches;
 
-CTransitionsFixPatch::SPlayerSlots CTransitionsFixPatch::player_slots;
+CTransitionsFixPatch::SReadyTracker *CTransitionsFixPatch::tracker_slots[NUM_TRACKER_SLOTS];
 
 CGlobalVars *CTransitionsFixPatch::gpGlobals;
 IServer *CTransitionsFixPatch::glob_sv;
@@ -30,7 +30,7 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
 
     //Rewire the functionality of m_bDataReceived
     //This bool[2] array is used to track whether all players are ready during a transition
-    //Replace it with an arbitrary-size linked list, reusing the 2 bytes as the uint16_t head index
+    //Replace it with an arbitrary-size ready tracker, reusing the 2 bytes as the uint16_t slot index
     SAnchor CPortalMPGameRules_destr_CPortalMPGameRules = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::destr_CPortalMPGameRules);
     SAnchor CPortalMPGameRules_ClientCommandKeyValues = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::ClientCommandKeyValues);
     SAnchor CPortalMPGameRules_ClientDisconnected = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::ClientDisconnected);
@@ -51,7 +51,12 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     CPortalMPGameRules_SendAllMapCompleteData = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::SendAllMapCompleteData).get_addr();
     CPortalMPGameRules_StartPlayerTransitionThinks = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::StartPlayerTransitionThinks).get_addr();
 
-    // - CPortalMPGameRules::~CPortalMPGameRules: detour to clear the connected list
+    // - CPortalMPGameRules::~CPortalMPGameRules: detour to allocate the ready tracker
+    plugin.register_patch<CPatch>(CPortalMPGameRules_CPortalMPGameRules + 0x316, new SEQ_HEX("66 89 8f 7d 1c 00 00"),
+        new SEQ_DETOUR(plugin, 7, detour_CPortalMPGameRules_CPortalMPGameRules, DETOUR_ARG_EDI)
+    );
+
+    // - CPortalMPGameRules::~CPortalMPGameRules: detour to delete the ready tracker
     plugin.register_patch<CPatch>(CPortalMPGameRules_destr_CPortalMPGameRules + 0x5f, new SEQ_HEX("8b 9e a8 1a 00 00"),
         new SEQ_DETOUR_COPY_ORIG(plugin, 6, detour_CPortalMPGameRules_destr_CPortalMPGameRules, DETOUR_ARG_ESI)
     );
@@ -65,7 +70,7 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
         new SEQ_HEX("85 d2") //test edx, edx
     ));
 
-    // - CPortalMPGameRules::ClientDisconnected: detour to remove client from connected list
+    // - CPortalMPGameRules::ClientDisconnected: detour to remove the player from the ready tracker
     //Replace the bIsSSCredits check to make room for the detour (it's no longer used because of the disconnect check patch anyway)
     plugin.register_patch<CPatch>(CPortalMPGameRules_ClientDisconnected + 0x69, new SEQ_MASKED_HEX("8b 0d ?? ?? ?? ?? 85 c9 74 0d e8 ?? ?? ?? ?? 84 c0 0f 85 b0 00 00 00"), new SEQ_SEQ(
         new SEQ_HEX("8b 4c 24 0c"), //mov ecx, [<this arg>]
@@ -99,62 +104,77 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     ));
 }
 
-uint16_t& CTransitionsFixPatch::get_rules_slot_list(void *rules) {
-    return *(uint16_t*) ((uint8_t*) rules + OFF_CPortalMPGameRules_m_bDataReceived);
+void CTransitionsFixPatch::SReadyTracker::init_match_req_player_count() {
+    req_player_cnt = -1;
+
+    //Access g_pMatchFramework->GetMatchSession()->GetSessionSettings()->GetInt("members/numPlayers") if it exists
+    void *g_pMatchFramework = *ptr_g_pMatchFramework;
+    if(!g_pMatchFramework) {
+        DevMsg("CTransitionsFixPatch | g_pMatchFramework = nullptr\n");
+        return;
+    }
+
+    void *match_session = PATCH_VTAB_FUNC(g_pMatchFramework, IMatchFramework::GetMatchSession)(g_pMatchFramework);
+    if(!match_session) {
+        DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession() = nullptr\n");
+        return;
+    }
+
+    void *session_settings = PATCH_VTAB_FUNC(match_session, IMatchSession::GetSessionSettings)(match_session);
+    if(!session_settings) {
+        DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings() = nullptr\n");
+        return;
+    }
+
+    req_player_cnt = KeyValues_GetInt(session_settings, "members/numPlayers", -1);
+    DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings()->GetInt(\"members/numPlayers\") = %d\n", req_player_cnt);
 }
 
-bool CTransitionsFixPatch::is_everyone_ready(void *rules, void *ignore_player) {
-    if(get_rules_slot_list(rules) == SPlayerSlots::INV_SLOT) return true;
+bool CTransitionsFixPatch::SReadyTracker::is_everyone_ready() const {
+    if(is_ready) return true;
 
-    //Determine the target player count
-    int player_count = -1;
+    int req_players = get_req_players();
+    DevMsg("CTransitionsFixPatch | SReadyTracker %p ready check: %d / %d players in list / total\n", this, ready_players.size(), req_players);
+    return ready_players.size() >= get_req_players();
+}
 
-    void *g_pMatchFramework = *ptr_g_pMatchFramework;
-    if(g_pMatchFramework) {
-        void *match_session = PATCH_VTAB_FUNC(g_pMatchFramework, IMatchFramework::GetMatchSession)(g_pMatchFramework);
-        if(match_session) {
-            void *session_settings = PATCH_VTAB_FUNC(match_session, IMatchSession::GetSessionSettings)(match_session);
-            if(session_settings) {
-                player_count = KeyValues_GetInt(session_settings, "members/numPlayers", -1);
-                DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings()->GetInt(\"members/numPlayers\") = %d\n", player_count);
-            } else DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings() = nullptr\n");
-        } else DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession() = nullptr\n");
-    } else DevMsg("CTransitionsFixPatch | g_pMatchFramework = nullptr\n");
+DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_CPortalMPGameRules(void **ptr_rules) {
+    void *rules = *ptr_rules;
+    DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::CPortalMPGameRules | this=%p\n", rules);
 
-    if(player_count < 0) {
-        fallback:;
-        //Fallback to the client count
-        player_count = glob_sv->GetNumClients() - glob_sv->GetNumProxies();
-        Msg("P2MPPatch | Matchmaking session player count not available, falling back to GetNumClients() - GetNumProxies()\n");
+    //Find a free tracker slot for the rules to reference
+    int slot = -1;
+    for(int i = 0; i < NUM_TRACKER_SLOTS; i++) {
+        if(tracker_slots[i]) continue;
+        slot = i;
+        break;
     }
+    if(slot < 0) abort();
 
-    if(ignore_player) {
-        //Check if the player appears in the client list
-        for(int i = 1; i <= gpGlobals->maxClients; i++) {
-            if(UTIL_PlayerByIndex(i) == ignore_player) {
-                DevMsg("CTransitionsFixPatch | Ignoring CPortal_Player %p for CPortalMPGameRules %p ready check\n", ignore_player, rules);
-                player_count--;
-                break;
-            }
-        }
+    //Allocate a ready tracker
+    SReadyTracker *tracker = new SReadyTracker();
+    tracker_slots[slot] = tracker;
+    get_rules_ready_tracker_slot(rules) = slot;
+
+    Msg("P2MPPatch | Allocated SReadyTracker %p [slot %d] for CPortalMPGameRules %p\n", tracker_slots[slot], slot, rules);
+
+    //Check if this is the initial load
+    //If so, obtain the number of initial players from the matchmaking server
+    if(tracker->get_req_players() == 0) {
+        tracker->init_match_req_player_count();
+        if(tracker->req_player_cnt >= 0) Msg("P2MPPatch | Detected initial server start, requested player count from matchmaking server -> %d players\n", tracker->req_player_cnt);
+        else Warning("P2MPPatch | Detected initial server start, but failed to request player count from matchmaking server\n");
     }
-
-    //Check if all players are in the ready list
-    int list_player_count = player_slots.num_players_in_list(get_rules_slot_list(rules));
-
-    Msg("P2MPPatch | CPortalMPGameRules %p ready check: %d / %d players in list / total\n", rules, list_player_count, player_count);
-    return list_player_count >= player_count;
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_destr_CPortalMPGameRules(void **ptr_rules) {
     void *rules = *ptr_rules;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::~CPortalMPGameRules | this=%p\n", rules);
 
-    if(get_rules_slot_list(rules) == SPlayerSlots::INV_SLOT) return;
-
-    //Free the slot list
-    Msg("P2MPPatch | Freeing ready player list for CPortalMPGameRules %p\n", ptr_rules);
-    player_slots.free_slot_list(get_rules_slot_list(rules));
+    //Free the ready tracker
+    Msg("P2MPPatch | Freeing SReadyTracker %p [slot %d] for CPortalMPGameRules %p\n", get_rules_ready_tracker(rules), (int) get_rules_ready_tracker_slot(rules), rules);
+    delete get_rules_ready_tracker(rules);
+    tracker_slots[get_rules_ready_tracker_slot(rules)] = nullptr;
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientCommandKeyValues_A(void **ptr_rules, void **ptr_pPlayer) {
@@ -162,25 +182,35 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientCommandKe
     void *pPlayer = *ptr_pPlayer;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::ClientCommandKeyValues A | this=%p pPlayer=%p\n", rules, pPlayer);
 
-    if(get_rules_slot_list(rules) == SPlayerSlots::INV_SLOT) return;
-
-    //Add the player to the slot list
-    if(!player_slots.list_contains_player(get_rules_slot_list(rules), pPlayer)) {
-        player_slots.add_player_to_list(get_rules_slot_list(rules), pPlayer);
-        Msg("P2MPPatch | Added CPortal_Player %p to ready list for CPortalMPGameRules %p, new player count: %d\n", pPlayer, rules, player_slots.num_players_in_list(get_rules_slot_list(rules)));
+    //Add the player to the ready tracker
+    SReadyTracker *tracker = get_rules_ready_tracker(rules);
+    if(tracker->ready_players.insert(pPlayer).second) {
+        Msg("P2MPPatch | Added CPortal_Player %p to CPortalMPGameRules %p ready tracker, new player count: %d\n", pPlayer, rules, tracker->ready_players.size());
     }
 }
 
-DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientCommandKeyValues_B(void **ptr_rules, int *ptr_everyoneReady) {
+DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientCommandKeyValues_B(void **ptr_rules, int *ptr_endTransition) {
     void *rules = *ptr_rules;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::ClientCommandKeyValues B | this=%p\n", rules);
 
-    *ptr_everyoneReady = is_everyone_ready(rules);
-    if(*ptr_everyoneReady && get_rules_slot_list(rules) != SPlayerSlots::INV_SLOT) {
-        Msg("P2MPPatch | All players ready, ending transition...\n");
-        player_slots.free_slot_list(get_rules_slot_list(rules));
-        get_rules_slot_list(rules) = SPlayerSlots::INV_SLOT;
+    SReadyTracker *tracker = get_rules_ready_tracker(rules);
+
+    if(tracker->is_ready) {
+        //We have already started, so just send the map complete data again as it has been modified
+        Msg("P2MPPatch | Resending map complete data for CPortalMPGameRules %p after new player joined\n", rules);
+        CPortalMPGameRules_SendAllMapCompleteData(rules);
+        *ptr_endTransition = false;
+        return;
     }
+
+    //Check if everyone is ready now
+    //This check is special, as it determines if the game ends the transition
+    if(tracker->is_everyone_ready()) {
+        Msg("P2MPPatch | All players ready, ending transition for CPortalMPGameRules %p...\n", rules);
+        tracker->is_ready = true;
+    }
+
+    *ptr_endTransition = tracker->is_ready;
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientDisconnected(void **ptr_rules, void **ptr_pPlayer) {
@@ -188,13 +218,29 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientDisconnec
     void *pPlayer = *ptr_pPlayer;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::ClientDisconnected | this=%p pPlayer=%p\n", rules, pPlayer);
 
-    if(!pPlayer || get_rules_slot_list(rules) == SPlayerSlots::INV_SLOT) return;
+    if(!pPlayer) return; //Apparently this is a valid set of arguments
 
-    //Remove the player from the slot list
-    if(player_slots.remove_player_from_list(get_rules_slot_list(rules), pPlayer)) {
-        Msg("P2MPPatch | Removed CPortal_Player %p from ready list for CPortalMPGameRules %p, new player count: %d\n", pPlayer, rules, player_slots.num_players_in_list(get_rules_slot_list(rules)));
-    } else if(is_everyone_ready(rules, pPlayer)) {
-        Msg("P2MPPatch | All players ready after CPortal_Player %p disconnected, ending transition...\n", pPlayer);
+    SReadyTracker *tracker = get_rules_ready_tracker(rules);
+
+    //Remove the player from the ready tracker
+    bool didRemovePlayer = tracker->ready_players.erase(pPlayer) > 0;
+
+    //Skip the following logic if we're already ready
+    if(tracker->is_ready) return; 
+
+    if(didRemovePlayer) {
+        //We succesfully removed the player
+        Msg("P2MPPatch | Removed CPortal_Player %p from CPortalMPGameRules %p ready tracker, new player count: %d\n", pPlayer, rules, tracker->ready_players.size());
+        return;
+    }
+
+    //The player wasn't ready before disconnecting
+    //Now that they are no longer stalling the transition, check if everyone else is ready
+    if(tracker->is_everyone_ready()) {
+        Msg("P2MPPatch | All players ready after CPortal_Player %p disconnected, ending transition for CPortalMPGameRules %p...\n", pPlayer, rules);
+        tracker->is_ready = true;
+
+        //We have to manually end the transition, as the usual ClientCommandKeyValues logic isn't run
         CPortalMPGameRules_SendAllMapCompleteData(rules);
         CPortalMPGameRules_StartPlayerTransitionThinks(rules);
     }
@@ -205,24 +251,22 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_SetMapCompleteD
     void *pPlayer = *ptr_pPlayer;
     DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::SetMapCompleteData | this=%p pPlayer=%p\n", rules, pPlayer);
 
-    if(get_rules_slot_list(rules) != SPlayerSlots::INV_SLOT) {
-        *ptr_shouldAbort = player_slots.list_contains_player(get_rules_slot_list(rules), pPlayer);
-        DevMsg(*ptr_shouldAbort ? " -> ready list contains the player, aborting...\n" : " -> ready list does not contain the player, continuing...\n");
-    } else {
-        //We have already started, so just send the map complete data again for the player
-        Msg("P2MPPatch | Sending map complete data for late CPortal_Player %p...\n", pPlayer);
-        CPortalMPGameRules_SendAllMapCompleteData(rules);
-    }
+    SReadyTracker *tracker = get_rules_ready_tracker(rules);
+
+    //Check if the player is already ready
+    *ptr_shouldAbort = (tracker->ready_players.find(pPlayer) != tracker->ready_players.end());
+    if(*ptr_shouldAbort) DevMsg("CTransitionsFixPatch | CPortal_Player %p already in SReadyTracker %p, aborting 'read_stats' request\n", pPlayer, tracker);
+    else DevMsg("CTransitionsFixPatch | CPortal_Player %p not in SReadyTracker %p, sending 'read_stats' request...\n", pPlayer, tracker);
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortal_Player_Spawn(void **ptr_rules, int *ptr_everyoneReady) {
     void *rules = *ptr_rules;
     DevMsg("DETOUR CTransitionsFixPatch | CPortal_Player::Spawn | rules=%p\n", rules);
-    *ptr_everyoneReady = is_everyone_ready(rules);
+    *ptr_everyoneReady = get_rules_ready_tracker(rules)->is_everyone_ready();
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortal_Player_OnFullyConnected(void **ptr_rules, int *ptr_everyoneReady) {
     void *rules = *ptr_rules;
     DevMsg("DETOUR CTransitionsFixPatch | CPortal_Player::OnFullyConnected | rules=%p\n", rules);
-    *ptr_everyoneReady = is_everyone_ready(rules);
+    *ptr_everyoneReady = get_rules_ready_tracker(rules)->is_everyone_ready();
 }
