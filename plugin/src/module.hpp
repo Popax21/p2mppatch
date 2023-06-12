@@ -11,11 +11,32 @@ class CModule : public IByteSequence {
     public:
         static const int MAX_NEEDLE_SIZE = 32;
 
-        enum class page_flag {
+        class CUnprotector {
+            public:
+                CUnprotector(CModule *mod) : m_Module(mod) {
+                    if(mod) mod->unprotect();
+                }
+                CUnprotector(CUnprotector& prot) = delete;
+                CUnprotector(const CUnprotector& prot) = delete;
+                ~CUnprotector() { finalize(); }
+
+                void finalize() {
+                    if(!m_Module) return;
+                    m_Module->reprotect();
+                    m_Module = nullptr;
+                }
+
+            private:
+                CModule *m_Module;
+        };
+
+        enum class EPageFlag {
             PAGE_R = 1, PAGE_W = 2, PAGE_X = 4, PAGE_UNPROT = 8
         };
 
         CModule(const char *name);
+        CModule(CModule& mod) = delete;
+        CModule(const CModule& mod) = delete;
         ~CModule();
 
         virtual const char *name() const { return m_Name; }
@@ -32,7 +53,7 @@ class CModule : public IByteSequence {
         virtual void reprotect();
 
         virtual uint8_t operator [](size_t off) const {
-            if(!(m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R)) return 0;
+            if(!(m_PageFlags[off / PAGE_SIZE] & (int) EPageFlag::PAGE_R)) return 0;
             return ((uint8_t*) m_BaseAddr)[off];
         }
 

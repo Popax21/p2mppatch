@@ -18,9 +18,9 @@
 void CMPPatchPlugin::update_patches() {
     //Prepare modules
     Msg("Preparing modules...\n");
-    m_EngineModule->unprotect();
-    m_MatchMakingModule->unprotect();
-    m_ServerModule->unprotect();
+    CModule::CUnprotector engine_unprot(m_EngineModule);
+    CModule::CUnprotector matchmaking_unprot(m_MatchMakingModule);
+    CModule::CUnprotector server_unprot(m_ServerModule);
 
     //Delete old patches
     if(m_Patches.size() > 0) {
@@ -46,13 +46,18 @@ void CMPPatchPlugin::update_patches() {
 
     //Finalize modules
     Msg("Finalizing modules...\n");
-    m_EngineModule->reprotect();
-    m_MatchMakingModule->reprotect();
-    m_ServerModule->reprotect();
+    engine_unprot.finalize();
+    matchmaking_unprot.finalize();
+    server_unprot.finalize();
 }
 
 //Server callbacks
 bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory) {
+    if(m_LoadCount++ > 0) {
+        Warning("P2MPPatch plugin is already loaded!\n");
+        return false;
+    }
+
     ConnectTier1Libraries(&interfaceFactory, 1);
     ConnectTier2Libraries(&interfaceFactory, 1);
 
@@ -87,19 +92,17 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
 }
 
 void CMPPatchPlugin::Unload() {
+    if(--m_LoadCount > 0) return;
+
     try {
         //Delete patches
         Msg("Deleting patches...\n");
-
-        if(m_EngineModule) m_EngineModule->unprotect();
-        if(m_MatchMakingModule) m_MatchMakingModule->unprotect();
-        if(m_ServerModule) m_ServerModule->unprotect();
-
-        clear_patches();
-
-        if(m_EngineModule) m_EngineModule->reprotect();
-        if(m_MatchMakingModule) m_MatchMakingModule->reprotect();
-        if(m_ServerModule) m_ServerModule->reprotect();
+        {
+            CModule::CUnprotector engine_unprot(m_EngineModule);
+            CModule::CUnprotector matchmaking_unprot(m_MatchMakingModule);
+            CModule::CUnprotector server_unprot(m_ServerModule);
+            clear_patches();
+        }
 
         //Delete registrars
         Msg("Deleting registrars...\n");

@@ -1,8 +1,8 @@
 #ifndef H_P2MPPATCH_PATCHES_TRANSITIONS_FIX
 #define H_P2MPPATCH_PATCHES_TRANSITIONS_FIX
 
-#include <tier0/valve_minmax_off.h>
 #include <iserver.h>
+#include <tier0/valve_minmax_off.h>
 
 #include <set>
 #include "plugin.hpp"

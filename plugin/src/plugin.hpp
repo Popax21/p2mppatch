@@ -1,11 +1,12 @@
 #ifndef H_P2MPPATCH_PLUGIN
 #define H_P2MPPATCH_PLUGIN
 
-#include <vector>
-#include <memory>
 #include <engine/iserverplugin.h>
-#include <tier0/valve_minmax_off.h>
 #include <game/server/iplayerinfo.h>
+#include <tier0/valve_minmax_off.h>
+
+#include <memory>
+#include <vector>
 #include "module.hpp"
 #include "scratchpad.hpp"
 #include "patch.hpp"
@@ -56,6 +57,7 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         virtual void OnEdictFreed(const edict_t *edict);
 
     private:
+        int m_LoadCount;
         IPlayerInfoManager *m_PlayerInfoManager;
 
         CScratchPad m_ScratchPad;
@@ -65,5 +67,7 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
 
         void clear_patches();
 };
+
+extern CMPPatchPlugin g_MPPatchPlugin;
 
 #endif

@@ -46,9 +46,9 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
     for(int i = 0; i < info->dlpi_phnum; i++) {
         Elf32_Word pflags = info->dlpi_phdr[i].p_flags;
         uint8_t flags = 0;
-        if(pflags & PF_R) flags |= (uint8_t) CModule::page_flag::PAGE_R;
-        if(pflags & PF_W) flags |= (uint8_t) CModule::page_flag::PAGE_W;
-        if(pflags & PF_X) flags |= (uint8_t) CModule::page_flag::PAGE_X;
+        if(pflags & PF_R) flags |= (uint8_t) CModule::EPageFlag::PAGE_R;
+        if(pflags & PF_W) flags |= (uint8_t) CModule::EPageFlag::PAGE_W;
+        if(pflags & PF_X) flags |= (uint8_t) CModule::EPageFlag::PAGE_X;
 
         uintptr_t ph_start = info->dlpi_addr + info->dlpi_phdr[i].p_vaddr, ph_end = ph_start + info->dlpi_phdr[i].p_memsz;
         for(uintptr_t i = ph_start / PAGE_SIZE; i*PAGE_SIZE < ph_end; i++) params->page_flags[i - start_addr / PAGE_SIZE] = flags;
@@ -79,9 +79,9 @@ static bool find_module(const char *name, void **base_addr, size_t *size, uint8_
 
 static void apply_page_flags(void *page, uint8_t flags) {
     int prot = 0;
-    if(flags & (int) CModule::page_flag::PAGE_R) prot |= PROT_READ;
-    if(flags & (int) CModule::page_flag::PAGE_W) prot |= PROT_WRITE;
-    if(flags & (int) CModule::page_flag::PAGE_X) prot |= PROT_EXEC;
+    if(flags & (int) CModule::EPageFlag::PAGE_R) prot |= PROT_READ;
+    if(flags & (int) CModule::EPageFlag::PAGE_W) prot |= PROT_WRITE;
+    if(flags & (int) CModule::EPageFlag::PAGE_X) prot |= PROT_EXEC;
     if(mprotect(page, PAGE_SIZE, prot) < 0) {
         throw std::system_error(errno, std::system_category());
     }
@@ -112,7 +112,7 @@ int CModule::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, 
     while(size > 0) {
         size_t sz = std::min(size, PAGE_SIZE - (this_off % PAGE_SIZE));
 
-        if(m_PageFlags[this_off / PAGE_SIZE] & (int) page_flag::PAGE_R) {
+        if(m_PageFlags[this_off / PAGE_SIZE] & (int) EPageFlag::PAGE_R) {
             int r = seq.compare((uint8_t*) m_BaseAddr + this_off, seq_off, sz);
             if(r != 0) return -r;
         } else {
@@ -133,7 +133,7 @@ int CModule::compare(const uint8_t *buf, size_t off, size_t size) const {
     while(size > 0) {
         size_t sz = std::min(size, PAGE_SIZE - (off % PAGE_SIZE));
 
-        if(m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R) {
+        if(m_PageFlags[off / PAGE_SIZE] & (int) EPageFlag::PAGE_R) {
             int r = memcmp((uint8_t*) m_BaseAddr + off, buf, sz);
             if(r != 0) return r;
         } else {
@@ -154,7 +154,7 @@ void CModule::get_data(uint8_t *buf, size_t off, size_t size) const {
     while(size > 0) {
         size_t sz = std::min(size, PAGE_SIZE - (off % PAGE_SIZE));
 
-        if(m_PageFlags[off / PAGE_SIZE] & (int) page_flag::PAGE_R) memcpy((uint8_t*) m_BaseAddr + off, buf, sz);
+        if(m_PageFlags[off / PAGE_SIZE] & (int) EPageFlag::PAGE_R) memcpy((uint8_t*) m_BaseAddr + off, buf, sz);
         else memset(buf, 0, sz);
 
         buf += sz;
@@ -182,12 +182,12 @@ void CModule::unprotect() {
     size_t num_unprot = 0;
     for(size_t i = 0; i*PAGE_SIZE < m_Size; i++) {
         //Check if the page is readable, but isn't writeable
-        if(!(m_PageFlags[i] & (int) page_flag::PAGE_R)) continue;
-        if((m_PageFlags[i] & (int) page_flag::PAGE_W) || (m_PageFlags[i] & (int) page_flag::PAGE_UNPROT)) continue;
+        if(!(m_PageFlags[i] & (int) EPageFlag::PAGE_R)) continue;
+        if((m_PageFlags[i] & (int) EPageFlag::PAGE_W) || (m_PageFlags[i] & (int) EPageFlag::PAGE_UNPROT)) continue;
 
         //Make the page writeable
-        apply_page_flags((uint8_t*) m_BaseAddr + i*PAGE_SIZE, m_PageFlags[i] | (uint8_t) page_flag::PAGE_W);
-        m_PageFlags[i] |= (uint8_t) page_flag::PAGE_UNPROT;
+        apply_page_flags((uint8_t*) m_BaseAddr + i*PAGE_SIZE, m_PageFlags[i] | (uint8_t) EPageFlag::PAGE_W);
+        m_PageFlags[i] |= (uint8_t) EPageFlag::PAGE_UNPROT;
         num_unprot++;
     }
     DevMsg("Unprotected 0x%x pages in module '%s'\n", num_unprot, m_Name);
@@ -197,10 +197,10 @@ void CModule::reprotect() {
     size_t num_reprot = 0;
     for(size_t i = 0; i*PAGE_SIZE < m_Size; i++) {
         //Check if the page has been unprotected
-        if(!(m_PageFlags[i] & (int) page_flag::PAGE_UNPROT)) continue;
+        if(!(m_PageFlags[i] & (int) EPageFlag::PAGE_UNPROT)) continue;
 
         //Re-apply the old page flags 
-        m_PageFlags[i] &= ~(uint8_t) page_flag::PAGE_UNPROT;
+        m_PageFlags[i] &= ~(uint8_t) EPageFlag::PAGE_UNPROT;
         apply_page_flags((uint8_t*) m_BaseAddr + i*PAGE_SIZE, m_PageFlags[i]);
         num_reprot++;
     }
