@@ -13,6 +13,7 @@
 #include "patches/player_count.hpp"
 #include "patches/dc_check.hpp"
 #include "patches/transitions_fix.hpp"
+#include "patches/player_stuck.hpp"
 #include "patches/env_fade.hpp"
 
 void CMPPatchPlugin::update_patches() {
@@ -79,6 +80,7 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
         m_PatchRegistrars.emplace_back(new patches::CPlayerCountPatch(MAX_PLAYERS));
         m_PatchRegistrars.emplace_back(new patches::CDCCheckPatch());
         m_PatchRegistrars.emplace_back(new patches::CTransitionsFixPatch());
+        m_PatchRegistrars.emplace_back(new patches::CPlayerStuckPatch());
         m_PatchRegistrars.emplace_back(new patches::CEnvFadePatch());
 
         //Apply patches
@@ -143,9 +145,9 @@ void CMPPatchPlugin::UnPause() {}
 const char *CMPPatchPlugin::GetPluginDescription() { return "Patches Portal 2 multiplayer to work with arbitrary players and maps"; }
 
 void CMPPatchPlugin::LevelInit(char const *pMapName) {}
+void CMPPatchPlugin::LevelShutdown(void) {}
 void CMPPatchPlugin::ServerActivate(edict_t *pEdictList, int edictCount, int clientMax) {}
 void CMPPatchPlugin::GameFrame(bool simulating) {}
-void CMPPatchPlugin::LevelShutdown(void) {}
 
 void CMPPatchPlugin::ClientActive(edict_t *pEntity) {}
 void CMPPatchPlugin::ClientFullyConnect(edict_t *pEntity) {}

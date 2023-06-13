@@ -10,14 +10,19 @@
 class CDetour : public IByteSequence {
     public:
         struct SArgument {
-            bool is_reg;
+            enum EType {
+                REG, LOCAL_VAR, STACK_VAR
+            };
+
+            EType type;
             int val;
 
-            SArgument(bool is_reg, int val) : is_reg(is_reg), val(val) {}
+            SArgument(EType type, int val) : type(type), val(val) {}
 
-            static const SArgument reg_eax, reg_ebx, reg_ecx, reg_edx, reg_esi, reg_edi;
+            static const SArgument reg_eax, reg_ebx, reg_ecx, reg_edx, reg_esi, reg_edi, reg_eip;
 
-            static inline SArgument local_var(int ebp_off) { return SArgument(false, ebp_off); };
+            static inline SArgument local_var(int ebp_off) { return SArgument(EType::LOCAL_VAR, ebp_off); };
+            static inline SArgument stack_var(int esp_off) { return SArgument(EType::STACK_VAR, esp_off); };
         };
 
         static const int MIN_SIZE = 5;
@@ -72,7 +77,9 @@ class CDetour : public IByteSequence {
 #define DETOUR_ARG_EDX CDetour::SArgument::reg_edx
 #define DETOUR_ARG_ESI CDetour::SArgument::reg_esi
 #define DETOUR_ARG_EDI CDetour::SArgument::reg_edi
+#define DETOUR_ARG_EIP CDetour::SArgument::reg_eip
 #define DETOUR_ARG_LOCAL(ebp_off) CDetour::SArgument::local_var(ebp_off)
+#define DETOUR_ARG_STACK(esp_off) CDetour::SArgument::stack_var(esp_off)
 
 #define SEQ_DETOUR(plugin, size, func, ...) CDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ })
 #define SEQ_DETOUR_COPY_ORIG(plugin, size, func, ...) CDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ }, true)

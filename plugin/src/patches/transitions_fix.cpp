@@ -1,5 +1,4 @@
 #include <tier0/dbg.h>
-#include <tier1/KeyValues.h>
 #include <tier0/valve_minmax_off.h>
 #include <iserver.h>
 

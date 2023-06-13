@@ -43,13 +43,20 @@ namespace patches {
             const SFuncAnchor StartPlayerTransitionThinks("83 ec 08 be 41 08 00 00 31 ff 6a 00 6a 00 57 56 50 8d 44 24 24 50", 0x36);
         }
 
+        namespace CGameMovement {
+            const SFuncAnchor CheckStuck("8d 6c 24 30 83 ec 0c 8b 13 c6 83 6e 06 00 00 01 8d 7c 24 48 57", 0x1f);
+        }
+
         namespace CBaseEntity {
             const SFuncAnchor ThinkSet("55 57 56 53 83 ec 1c 8b 74 24 44 f3 0f 7e 44 24 38");
             const SFuncAnchor SetNextThink("f3 0f 10 44 24 34 8b 6c 24 30 0f 2e c1 8b 74 24 38", 0x7);
         }
 
         namespace CPortal_Player {
+            const SFuncAnchor destr_CPortal_Player();
+
             const SFuncAnchor Spawn("8b 03 89 1c 24 ff 90 3c 08 00 00 83 c4 10 80 bb 10 0b 00 00 00", 0x62);
+            const SFuncAnchor ShouldCollide("53 8b 4c 24 08 8b 44 24 0c 8b 5c 24 10 8b 52 30", 0x6);
 
             const SFuncAnchor ClientCommand("55 89 e5 57 56 53 81 ec 9c 00 00 00 8b 7d 0c 8b 5d 08 8b 07 85 c0");
 

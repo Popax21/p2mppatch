@@ -3,38 +3,60 @@
 #include <vector>
 #include "detour.hpp"
 
-const CDetour::SArgument CDetour::SArgument::reg_eax(true, 7 - 0);
-const CDetour::SArgument CDetour::SArgument::reg_ebx(true, 7 - 3);
-const CDetour::SArgument CDetour::SArgument::reg_ecx(true, 7 - 1);
-const CDetour::SArgument CDetour::SArgument::reg_edx(true, 7 - 2);
-const CDetour::SArgument CDetour::SArgument::reg_esi(true, 7 - 6);
-const CDetour::SArgument CDetour::SArgument::reg_edi(true, 7 - 7);
+const CDetour::SArgument CDetour::SArgument::reg_eax(CDetour::SArgument::EType::REG, 0);
+const CDetour::SArgument CDetour::SArgument::reg_ebx(CDetour::SArgument::EType::REG, 3);
+const CDetour::SArgument CDetour::SArgument::reg_ecx(CDetour::SArgument::EType::REG, 1);
+const CDetour::SArgument CDetour::SArgument::reg_edx(CDetour::SArgument::EType::REG, 2);
+const CDetour::SArgument CDetour::SArgument::reg_esi(CDetour::SArgument::EType::REG, 6);
+const CDetour::SArgument CDetour::SArgument::reg_edi(CDetour::SArgument::EType::REG, 7);
+const CDetour::SArgument CDetour::SArgument::reg_eip(CDetour::SArgument::EType::REG, -1);
 
 bool CDetour::apply_anchor(SAnchor anchor) {
     //Build the scratchpad sequence
     CSequentialByteSequence scratch_seq;
 
-    // - push arguments
+    // - optionally copy the original asm
+    if(m_DetourCopyOrigAsm) scratch_seq.emplace_sequence<CArraySequence>((const uint8_t*) anchor.get_addr(), m_DetourSize);
+
     std::vector<uint8_t> prefix_seq;
+    unsigned int esp_off = 0;
 
+    // - push return address
+    void *ret_addr = (anchor + m_DetourSize).get_addr();
+    prefix_seq.push_back(0x68);
+    prefix_seq.insert(prefix_seq.end(), (uint8_t*) &ret_addr, ((uint8_t*) &ret_addr) + 4);
+    esp_off += 0x4;
+
+    // - save registers
     prefix_seq.push_back(0x60); //pusha
-    unsigned int pusha_esp_off = 0;
+    esp_off += 0x20;
 
+    // - push arguments
     for(int i = m_DetourArgs.size()-1; i >= 0; i--) {
         const SArgument& arg = m_DetourArgs[i];
-        if(arg.is_reg) {
-            //lea eax, [esp + <offset to value in pusha block>]
-            unsigned int off = pusha_esp_off + arg.val * 4;
-            prefix_seq.insert(prefix_seq.end(), { 0x8d, 0x84, 0x24 });
-            prefix_seq.insert(prefix_seq.end(), (uint8_t*) &off, ((uint8_t*) &off) + 4);
-        } else {
-            //lea eax, [ebp + <offset>]
-            prefix_seq.insert(prefix_seq.end(), { 0x8d, 0x85 });
-            prefix_seq.insert(prefix_seq.end(), (uint8_t*) &arg.val, ((uint8_t*) &arg.val) + 4);
+        switch(arg.type) {
+            case SArgument::EType::REG: {
+                //lea eax, [esp + <offset to value in pusha block>]
+                unsigned int off = (esp_off-4) - arg.val * 4 - 4;
+                prefix_seq.insert(prefix_seq.end(), { 0x8d, 0x84, 0x24 });
+                prefix_seq.insert(prefix_seq.end(), (uint8_t*) &off, ((uint8_t*) &off) + 4);
+            } break;
+            case SArgument::EType::LOCAL_VAR: {
+                //lea eax, [ebp + <offset>]
+                prefix_seq.insert(prefix_seq.end(), { 0x8d, 0x85 });
+                prefix_seq.insert(prefix_seq.end(), (uint8_t*) &arg.val, ((uint8_t*) &arg.val) + 4);
+            } break;
+            case SArgument::EType::STACK_VAR: {
+                //lea eax, [esp + <esp offset> + <offset>]
+                unsigned int off = esp_off + arg.val;
+                prefix_seq.insert(prefix_seq.end(), { 0x8d, 0x84, 0x24 });
+                prefix_seq.insert(prefix_seq.end(), (uint8_t*) &off, ((uint8_t*) &off) + 4);
+            } break;
         }
+
         //push eax
         prefix_seq.push_back(0x50);
-        pusha_esp_off += 4;
+        esp_off += 4;
     }
 
     scratch_seq.emplace_sequence<CVectorSequence>(prefix_seq);
@@ -42,17 +64,13 @@ bool CDetour::apply_anchor(SAnchor anchor) {
     // - call the detour function
     scratch_seq.add_sequence(new SEQ_CALL(SAnchor(m_DetourFunc)));
 
-    // - pop arguments
+    // - pop arguments and return back to the detoured code
     std::vector<uint8_t> suffix_seq;
     suffix_seq.insert(suffix_seq.end(), { 0x83, 0xc4, (uint8_t) (0x04 * m_DetourArgs.size()) }); //add esp, <4 * numArgs>
     suffix_seq.push_back(0x61); //popa
+    suffix_seq.push_back(0xc3); //add esp, 4
+
     scratch_seq.emplace_sequence<CVectorSequence>(suffix_seq);
-
-    // - optionally copy the original asm
-    if(m_DetourCopyOrigAsm) scratch_seq.emplace_sequence<CArraySequence>((const uint8_t*) anchor.get_addr(), m_DetourSize);
-
-    // - jump back to the detoured code
-    scratch_seq.add_sequence(new SEQ_JMP(anchor + m_DetourSize));
 
     //Allocate the sequence on the scratchpad
     m_ScratchPadEntry = m_ScratchPad.alloc_seq(scratch_seq);
