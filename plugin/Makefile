@@ -2,10 +2,6 @@ PLUGIN := p2mppatch.so
 SDK ?= $(realpath ../sdk)
 STEAM_RUNTIME_PATH ?= $(realpath ../runtime)
 
-AR := $(STEAM_RUNTIME_PATH)/bin/ar
-CC := $(STEAM_RUNTIME_PATH)/bin/gcc
-CXX := $(STEAM_RUNTIME_PATH)/bin/g++
-
 all: $(PLUGIN)
 
 SRC := compat.cpp plugin.cpp byteseq.cpp module.cpp anchor.cpp sufarr.cpp scratchpad.cpp patch.cpp detour.cpp patches/anchors.cpp patches/transitions_fix.cpp patches/player_stuck.cpp
@@ -19,6 +15,7 @@ SDKSTATLIB := tier1.a mathlib.a tier2.a
 SDKSTATLIB := $(addprefix $(SDK)/mp/src/lib/public/linux32/, $(SDKSTATLIB))
 
 # OPTFLAGS ?= -O0 -g3
+# OPTFLAGS ?= -O0 -g3 -fsanitize=address
 OPTFLAGS ?= -O3 -g3
 CPPFLAGS := $(OPTFLAGS) -m32 -std=gnu++0x -march=core2 -mtune=core2 -msse2 -mfpmath=sse -fpermissive -DNO_HOOK_MALLOC -DNO_MALLOC_OVERRIDE -DGNUC -DCOMPILER_GCC -DPOSIX -D_POSIX -DLINUX -D_LINUX -DDLLNAME=p2mppatch
 CFLAGS := $(CPPFLAGS) -I"src" -I"$(SDK)/mp/src/public" -I"$(SDK)/mp/src/public/tier0" -I"$(SDK)/mp/src/public/tier1" -I"$(COMPILER)/include/c++/4.6.3"

@@ -1,9 +1,19 @@
 #include <time.h>
+#include <math.h>
 
-//Our the SDK we link against is obviously not the actual P2 SDK, so we have to do some hacky jank to make it work ._.
+//The SDK we link against is obviously not the actual P2 SDK, so we have to do some hacky jank to make it work ._.
 //We use the older __sync primitives as the SDK GCC is too old for the __atomic ones
 
 extern "C" {
+
+const char *__asan_default_options() {
+    //Needed for debugging
+    return "verify_asan_link_order=false:abort_on_error=1:detect_leaks=0";
+}
+
+double __pow_finite(double a, double b) {
+    return pow(a, b);
+}
 
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
     return localtime_r(timep, result);
