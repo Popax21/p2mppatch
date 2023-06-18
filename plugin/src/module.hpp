@@ -1,14 +1,28 @@
 #ifndef H_P2MPPATCH_MODULE
 #define H_P2MPPATCH_MODULE
 
+#include <tier0/dbg.h>
+#include <tier0/valve_minmax_off.h>
+
+#include <sstream>
+#include <stdexcept>
 #include "byteseq.hpp"
 #include "sufarr.hpp"
 #include "anchor.hpp"
 
-#define PAGE_SIZE 0x1000
+class CModule;
+
+class IModuleDependent {
+    protected:
+        virtual void associate(CModule& module) = 0;
+        virtual void reset() = 0;
+
+        friend class CModule;
+};
 
 class CModule : public IByteSequence {
     public:
+        static const int PAGE_SIZE = 0x1000;
         static const int MAX_NEEDLE_SIZE = 32;
 
         class CUnprotector {
@@ -52,6 +66,9 @@ class CModule : public IByteSequence {
         virtual void unprotect();
         virtual void reprotect();
 
+        virtual void associate_dependent(IModuleDependent *dep);
+        virtual void reset_dependents();
+
         virtual uint8_t operator [](size_t off) const {
             if(!(m_PageFlags[off / PAGE_SIZE] & (int) EPageFlag::PAGE_R)) return 0;
             return ((uint8_t*) m_BaseAddr)[off];
@@ -64,6 +81,40 @@ class CModule : public IByteSequence {
 
         uint8_t *m_PageFlags;
         CSuffixArray *m_SufArray;
+
+        std::vector<IModuleDependent*> m_Dependents;
+};
+
+template<typename T> class IModuleFact : IModuleDependent {
+    public:
+        virtual const char *fact_name() const = 0;
+
+        T get(CModule& module) {
+            if(!m_Module) module.associate_dependent(this);
+            if(m_Module == &module) return m_Value;
+
+            std::stringstream sstream;
+            sstream << "Conflicting IModuleFact module associations: '" << m_Module->name() << "' (" << m_Module << ") != '" << module.name() << "' (" << &module << ")";
+            throw std::runtime_error(sstream.str());
+        }
+
+    protected:
+        virtual T determine_value(CModule& module) = 0;
+
+    private:
+        CModule *m_Module;
+        T m_Value;
+
+        virtual void associate(CModule& module) {
+            m_Value = determine_value(module);
+            m_Module = &module;
+            DevMsg("Associated IModuleFact '%s' with module '%s'\n", fact_name(), m_Module->name());
+        }
+
+        virtual void reset() {
+            m_Module = nullptr;
+            m_Value = T();
+        }
 };
 
 #endif

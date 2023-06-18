@@ -46,7 +46,7 @@ CScratchPad::SSeqEntry CScratchPad::alloc_seq(IByteSequence& seq) {
         }
     }
 
-    throw std::runtime_error("Insufficient scratchpad memory available!");
+    throw std::runtime_error("Insufficient scratchpad memory available");
 
     found_page:;
 
@@ -58,7 +58,7 @@ CScratchPad::SSeqEntry CScratchPad::alloc_seq(IByteSequence& seq) {
 
     SSeqEntry seq_entry(this, page_idx, seq_anchor, seq_size);
 
-    if(!seq.apply_anchor(seq_anchor)) throw std::runtime_error("Couldn't anchor scratchpad sequence!");
+    if(!seq.apply_anchor(seq_anchor)) throw std::runtime_error("Couldn't anchor scratchpad sequence");
     seq.get_data((uint8_t*) seq_anchor.get_addr(), 0, seq_size);
 
     DevMsg("Allocated %d byte scratchpad entry in page %d [%p]\n", seq_size, page_idx, seq_anchor.get_addr());

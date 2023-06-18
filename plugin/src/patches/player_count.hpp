@@ -5,7 +5,6 @@
 #include "byteseq.hpp"
 #include "patch.hpp"
 #include "anchors.hpp"
-#include "utils.hpp"
 
 namespace patches {
     class CPlayerCountPatch : public IPatchRegistrar {
@@ -17,26 +16,26 @@ namespace patches {
             virtual void register_patches(CMPPatchPlugin& plugin) {
                 //Find CServerGameClients::GetPlayerLimits and patch maxplayers and defaultmaxplayers values
                 uint8_t max_players_p1 = m_MaxPlayers + 1;
-                SAnchor CServerGameClients_GetPlayerLimits = PATCH_FUNC_ANCHOR(plugin.server_module(), CServerGameClients::GetPlayerLimits);
+                SAnchor CServerGameClients_GetPlayerLimits = anchors::server::CServerGameClients::GetPlayerLimits.get(plugin.server_module());
                 plugin.register_patch<CPatch>(CServerGameClients_GetPlayerLimits + 0x07, new SEQ_HEX("c7 00 01 00 00 00"), new SEQ_HEX("c7 00 $1 00 00 00", { &m_MaxPlayers }));
                 plugin.register_patch<CPatch>(CServerGameClients_GetPlayerLimits + 0x11, new SEQ_HEX("c7 00 01 00 00 00"), new SEQ_HEX("c7 00 $1 00 00 00", { &m_MaxPlayers }));
                 plugin.register_patch<CPatch>(CServerGameClients_GetPlayerLimits + 0x31, new SEQ_HEX("b8 02 00 00 00"), new SEQ_HEX("b8 $1 00 00 00", { &max_players_p1 }));
 
                 //Find some player slot count ("members/numSlots") adjustion function
-                SAnchor FUNC_slotcount_adj = PATCH_FUNC_ANCHOR(plugin.server_module(), FUNC_numSlots_adj);
+                SAnchor FUNC_slotcount_adj = anchors::server::FUNC_numSlots_adj.get(plugin.server_module());
                 plugin.register_patch<CPatch>(FUNC_slotcount_adj + 0x701, new SEQ_HEX("be 01 00 00 00"), new SEQ_HEX("be $1 00 00 00", { &m_MaxPlayers })); //SP maps
                 plugin.register_patch<CPatch>(FUNC_slotcount_adj + 0x6a2, new SEQ_HEX("be 02 00 00 00"), new SEQ_HEX("be $1 00 00 00", { &m_MaxPlayers })); //MP maps
 
                 //Find CMatchTitleGameSettingsMgr::InitializeGameSettings and patch the "members/numSlots" value
-                SAnchor CMatchTitleGameSettingsMgr_InitializeGameSettings = PATCH_FUNC_ANCHOR(plugin.matchmaking_module(), CMatchTitleGameSettingsMgr::InitializeGameSettings);
+                SAnchor CMatchTitleGameSettingsMgr_InitializeGameSettings = anchors::matchmaking::CMatchTitleGameSettingsMgr::InitializeGameSettings.get(plugin.matchmaking_module());
                 plugin.register_patch<CPatch>(CMatchTitleGameSettingsMgr_InitializeGameSettings + 0x172, new SEQ_HEX("b8 01 00 00 00"), new SEQ_HEX("b8 $1 00 00 00", { &m_MaxPlayers }));
             }
 
             virtual void after_patch_status_change(CMPPatchPlugin& plugin, bool applied) {
                 //Invoke CGameServer::InitMaxClients to update the internal lower/upper maxplayers limits
                 Msg("Invoking CGameServer::InitMaxClients...\n");
-                SAnchor CGameServer_InitMaxClients = PATCH_FUNC_ANCHOR(plugin.engine_module(), CGameServer::InitMaxClients);
-                ((void *(*)(void*)) CGameServer_InitMaxClients.get_addr())(get_engine_global_CBaseServer(plugin.engine_module()));
+                SAnchor CGameServer_InitMaxClients = anchors::engine::CGameServer::InitMaxClients.get(plugin.engine_module());
+                ((void *(*)(void*)) CGameServer_InitMaxClients.get_addr())(anchors::engine::sv.get(plugin.engine_module()).get_addr());
             }
 
         private:

@@ -5,7 +5,6 @@
 #include <set>
 #include "detour.hpp"
 #include "anchors.hpp"
-#include "utils.hpp"
 #include "player_stuck.hpp"
 
 using namespace patches;
@@ -13,17 +12,17 @@ using namespace patches;
 int CPlayerStuckPatch::OFF_CBasePlayer_m_StuckLast;
 
 void CPlayerStuckPatch::register_patches(CMPPatchPlugin& plugin) {
-    OFF_CBasePlayer_m_StuckLast = get_server_CBasePlayer_m_StuckLast_offset(plugin.server_module());
+    OFF_CBasePlayer_m_StuckLast = anchors::server::CGameMovement::m_LastStuck.get(plugin.server_module());
 
     //Detour the start of CGameMovement::CheckStuck
-    SAnchor CGameMovement_CheckStuck = PATCH_FUNC_ANCHOR(plugin.server_module(), CGameMovement::CheckStuck);
+    SAnchor CGameMovement_CheckStuck = anchors::server::CGameMovement::CheckStuck.get(plugin.server_module());
     plugin.register_patch<CPatch>(CGameMovement_CheckStuck + 0xa, new SEQ_MASKED_HEX("a1 ?? ?? ?? ??"),
         new SEQ_DETOUR_COPY_ORIG(plugin, 5, detour_CGameMovement_CheckStuck, DETOUR_ARG_STACK(0xb0), DETOUR_ARG_ESI, DETOUR_ARG_EIP)
     );
 
     //Detour the portal_use_player_avoidance cvar check in CPortal_Player::ShouldCollide
     uint8_t bool_val_off = (uint8_t) OFF_ConVar_boolValue;
-    SAnchor CPortal_Player_ShouldCollide = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortal_Player::ShouldCollide);
+    SAnchor CPortal_Player_ShouldCollide = anchors::server::CPortal_Player::ShouldCollide.get(plugin.server_module());
     plugin.register_patch<CPatch>(CPortal_Player_ShouldCollide + 0xb, new SEQ_HEX("8b 44 24 0c 8b 5c 24 10 8b 52 $1", &bool_val_off), new SEQ_SEQ(
         new SEQ_DETOUR_COPY_ORIG(plugin, 8, detour_CPortal_Player_ShouldCollide, DETOUR_ARG_ECX, DETOUR_ARG_EDX, DETOUR_ARG_EAX, DETOUR_ARG_EDX),
         new SEQ_FILL(3, 0x90)

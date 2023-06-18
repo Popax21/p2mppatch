@@ -22,9 +22,9 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
 
         CScratchPad& scratchpad() { return m_ScratchPad; }
 
-        const CModule& engine_module() const { return *m_EngineModule; }
-        const CModule& matchmaking_module() const { return *m_MatchMakingModule; }
-        const CModule& server_module() const { return *m_ServerModule; }
+        CModule& engine_module() const { return *m_EngineModule; }
+        CModule& matchmaking_module() const { return *m_MatchMakingModule; }
+        CModule& server_module() const { return *m_ServerModule; }
 
         template<typename T, typename... Args> void register_patch(Args... args) {
             m_Patches.emplace_back(new T(args...));
@@ -43,7 +43,6 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         virtual void GameFrame(bool simulating);
 
         virtual void ClientActive(edict_t *pEntity);
-        virtual void ClientFullyConnect(edict_t *pEntity);
         virtual void ClientDisconnect(edict_t *pEntity);
         virtual void ClientPutInServer(edict_t *pEntity, char const *playername);
         virtual void SetCommandClient(int index);

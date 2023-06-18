@@ -4,6 +4,8 @@
 #include <tier0/dbg.h>
 #include "module.hpp"
 
+constexpr int PAGE_SIZE = CModule::PAGE_SIZE;
+
 static bool find_module(const char *name, void **base_addr, size_t *size);
 
 #ifdef LINUX
@@ -93,7 +95,11 @@ static void apply_page_flags(void *page, uint8_t flags) {
 
 CModule::CModule(const char *name) : m_Name(name) {
     //Find the module
-    if(!find_module(name, &m_BaseAddr, &m_Size, &m_PageFlags)) throw std::runtime_error("Can't find module '" + std::string(name) + "'!");
+    if(!find_module(name, &m_BaseAddr, &m_Size, &m_PageFlags)) {
+        std::stringstream sstream;
+        sstream << "Can't find module '" << name << "'";
+        throw std::runtime_error(sstream.str());
+    }
 
     //Build suffix array
     using namespace std::chrono;
@@ -104,6 +110,8 @@ CModule::CModule(const char *name) : m_Name(name) {
 }
 
 CModule::~CModule() {
+    reset_dependents();
+
     delete m_SufArray;
     m_SufArray = nullptr;
 }
@@ -168,7 +176,13 @@ SAnchor CModule::find_seq_anchor(const IByteSequence &seq) const {
 
     using namespace std::chrono;
     auto t1 = high_resolution_clock::now();
-    if(!m_SufArray->find_needle(seq, &off)) throw std::runtime_error("Can't find sequence needle [" + std::to_string(seq.size()) + " bytes] in module '" + std::string(m_Name) + "'");
+
+    if(!m_SufArray->find_needle(seq, &off)) {
+        std::stringstream sstream;
+        sstream << "Can't find sequence needle [" << seq.size() << " bytes] in module '" << m_Name << "'";
+        throw std::runtime_error(sstream.str());
+    }
+
     auto t2 = high_resolution_clock::now();
 
     DevMsg("Found sequence anchor for sequence '");
@@ -190,7 +204,7 @@ void CModule::unprotect() {
         m_PageFlags[i] |= (uint8_t) EPageFlag::PAGE_UNPROT;
         num_unprot++;
     }
-    DevMsg("Unprotected 0x%x pages in module '%s'\n", num_unprot, m_Name);
+    DevMsg("Unprotected 0x%zx pages in module '%s'\n", num_unprot, m_Name);
 }
 
 void CModule::reprotect() {
@@ -204,5 +218,16 @@ void CModule::reprotect() {
         apply_page_flags((uint8_t*) m_BaseAddr + i*PAGE_SIZE, m_PageFlags[i]);
         num_reprot++;
     }
-    DevMsg("Reprotected 0x%x pages in module '%s'\n", num_reprot, m_Name);
+    DevMsg("Reprotected 0x%zx pages in module '%s'\n", num_reprot, m_Name);
+}
+
+void CModule::associate_dependent(IModuleDependent *dep) {
+    dep->associate(*this);
+    m_Dependents.push_back(dep);
+}
+
+void CModule::reset_dependents() {
+    for(IModuleDependent *dep : m_Dependents) dep->reset();
+    if(m_Dependents.size() > 0) DevMsg("Reset %zd dependents of module '%s'\n", m_Dependents.size(), m_Name);
+    m_Dependents.clear();
 }

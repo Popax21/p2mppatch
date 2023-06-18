@@ -28,35 +28,35 @@ class CDetour : public IByteSequence {
         static const int MIN_SIZE = 5;
 
         CDetour(CScratchPad& scratch, int size, void *func, std::initializer_list<SArgument> args, bool copy_orig = false) : m_ScratchPad(scratch), m_DetourSize(size), m_DetourFunc(func), m_DetourArgs(args), m_DetourCopyOrigAsm(copy_orig) {
-            if(size < MIN_SIZE) throw std::runtime_error("Invalid detour patchsite size!");
+            if(size < MIN_SIZE) throw std::runtime_error("Invalid detour patchsite size");
         }
         virtual ~CDetour() {}
 
         virtual size_t size() const { return m_DetourSize; }
         virtual const uint8_t *buffer() const {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet!");
+            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
             return m_DetourJumpSeq->buffer();
         }
 
         virtual bool apply_anchor(SAnchor anchor);
 
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet!");
+            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
             return m_DetourJumpSeq->compare(seq, this_off, seq_off, size);
         }
 
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet!");
+            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
             return m_DetourJumpSeq->compare(buf, off, size);
         }
 
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet!");
+            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
             m_DetourJumpSeq->get_data(buf, off, size);
         }
 
         inline virtual uint8_t operator [](size_t off) const {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet!");
+            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
             return (*m_DetourJumpSeq)[off];
         }
 

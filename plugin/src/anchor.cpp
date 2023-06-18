@@ -5,9 +5,8 @@ void *SAnchor::get_addr() const { return (uint8_t*) (module ? module->base_addr(
 
 std::string SAnchor::debug_str() const {
     std::ostringstream stream;
-    if(module) stream << "'" << module->name() << "':" << std::hex << offset << " [" << get_addr() << "]";
+    if(debug_sym) stream << debug_sym << "+" << std::hex << debug_off << " [" << get_addr() << "]";
+    else if(module) stream << module->name() << "+" << std::hex << offset << " [" << get_addr() << "]";
     else stream << get_addr();
     return stream.str();
 }
-
-size_t SAnchor::operator -(SAnchor anchor) const { return (uintptr_t) get_addr() - (uintptr_t) anchor.get_addr(); }

@@ -3,7 +3,12 @@
 #include "patch.hpp"
 
 CPatch::CPatch(SAnchor target, IByteSequence *orig_seq, IByteSequence *new_seq) : m_PatchTarget(target), m_IsApplied(false), m_OrigSeq(orig_seq), m_NewSeq(new_seq), m_PatchSize(orig_seq->size()) {
-    if(orig_seq->size() != new_seq->size()) throw std::invalid_argument("Original and new sequences must be of the same size [" + std::to_string(orig_seq->size()) + " != " + std::to_string(new_seq->size()) + "]");
+    if(orig_seq->size() != new_seq->size()) {
+        std::stringstream sstream;
+        sstream << "Original and new sequences must be of the same size [" << orig_seq->size() << " != " << new_seq->size() << "]";
+        throw std::invalid_argument(sstream.str());
+    }
+
     m_OrigData = new uint8_t[m_PatchSize];
 }
 

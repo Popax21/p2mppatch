@@ -107,7 +107,7 @@ class CIgnoreSequence : public IByteSequence {
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const { return 0; }
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const { return 0; }
 
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { throw std::runtime_error("Can't access the data of an CIgnoreSequence!"); }
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { throw std::runtime_error("Can't access the data of an CIgnoreSequence"); }
         inline virtual uint8_t operator [](size_t off) const { return 0x42; }
 
     private:
@@ -121,7 +121,7 @@ class CFillSequence : public IByteSequence {
 
         virtual size_t size() const { return m_Size; };
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memset(buf, m_Fill, size); }
-        inline virtual uint8_t operator [](size_t off) const { return m_Fill; }
+        inline virtual uint8_t operator [](size_t off) const{ return m_Fill; }
 
     private:
         size_t m_Size;
@@ -187,7 +187,7 @@ class CMaskedHexSequence : public IByteSequence {
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const;
 
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { throw std::runtime_error("Can't access the data of an CMaskedHexSequence!"); }
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { throw std::runtime_error("Can't access the data of an CMaskedHexSequence"); }
         virtual uint8_t operator [](size_t off) const { return 0x42; }
 
     protected:
@@ -216,7 +216,7 @@ class CRefInstructionSequence : public IByteSequence {
         virtual size_t size() const { return m_Opcode.size() + sizeof(size_t); };
 
         virtual bool apply_anchor(SAnchor anchor) {
-            if(m_IsAnchored) throw std::runtime_error("CRefInstructionSequence is already anchored!");
+            if(m_IsAnchored) throw std::runtime_error("CRefInstructionSequence is already anchored");
             m_IsAnchored = true;
             m_InstrAnchor = anchor;
             return true;
@@ -227,7 +227,7 @@ class CRefInstructionSequence : public IByteSequence {
         }
 
         virtual uint8_t operator [](size_t off) const {
-            if(!m_IsAnchored) throw std::runtime_error("Can't access content of CRefInstructionSequence when not anchored!");
+            if(!m_IsAnchored) throw std::runtime_error("Can't access content of CRefInstructionSequence when not anchored");
             if(off < m_Opcode.size()) return m_Opcode[off];
 
             size_t rel = m_RefAnchor - (m_InstrAnchor + size());

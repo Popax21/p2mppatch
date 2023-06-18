@@ -3,95 +3,173 @@
 
 #include <tier0/dbg.h>
 #include <tier0/valve_minmax_off.h>
+
+#include <type_traits>
+#include <stdexcept>
+#include <sstream>
 #include "byteseq.hpp"
 #include "patch.hpp"
 
 namespace patches {
     namespace anchors {
-        struct SFuncAnchor {
-            CHexSequence sequence;
-            int offset;
+        struct SFuncAnchor : public IModuleFact<SAnchor> {
+            public:
+                SFuncAnchor(const char *name, const char *hex_seq, int off = 0) : m_Name(name), m_Sequence(hex_seq), m_Offset(off) {}
 
-            SFuncAnchor(const char *hex_seq, int off = 0) : sequence(hex_seq), offset(off) {}
+                const char *fact_name() const { return m_Name; }
+
+            private:
+                const char *m_Name;
+                CHexSequence m_Sequence;
+                int m_Offset;
+
+                virtual SAnchor determine_value(CModule& module) {
+                    SAnchor anchor = module.find_seq_anchor(m_Sequence) - m_Offset;
+                    DevMsg("- &(%s) = %p\n", m_Name, anchor.get_addr());
+                    anchor.mark_symbol(m_Name);
+                    return anchor;
+                }
         };
 
-        #define PATCH_FUNC_ANCHOR(module, name) ({\
-            SAnchor __func_anchor = module.find_seq_anchor(patches::anchors::name.sequence) - patches::anchors::name.offset;\
-            DevMsg("&(" #name ") = %p\n", __func_anchor.get_addr());\
-            __func_anchor;\
-        })
+        template<typename T> struct SRefInstrAnchor {
+            static_assert(std::is_same<T, uint8_t>::value || std::is_same<T, uint16_t>::value || std::is_same<T, int>::value || std::is_same<T, void*>::value, "SRefInstrAnchor can only work on primitive types");
+
+            public:
+                SRefInstrAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_val_off) : m_Name(name), m_Func(func), m_RefInstrOffset(instr_off), m_RefInstrSequence(instr_hex_seq), m_RefInstrValOff(instr_val_off) {}
+
+                SAnchor ref_instr_anchor(CModule& module) const { return m_Func.get(module) + m_RefInstrOffset; }
+                T determine_value(CModule& module) const;
+
+            private:
+                const char *m_Name;
+                IModuleFact<SAnchor>& m_Func;
+                int m_RefInstrOffset;
+                CMaskedHexSequence m_RefInstrSequence;
+                int m_RefInstrValOff;
+        };
+
+        struct SGlobVarAnchor : public IModuleFact<SAnchor>, SRefInstrAnchor<void*> {
+            public:
+                SGlobVarAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_ptr_off) : SRefInstrAnchor(name, func, instr_off, instr_hex_seq, instr_ptr_off), m_Name(name) {}
+
+                const char *fact_name() const { return m_Name; }
+
+            private:
+                const char *m_Name;
+
+                virtual SAnchor determine_value(CModule& module) {
+                    //Obtain and check the global pointer from the instruction
+                    uint8_t *glob_ptr = (uint8_t*) SRefInstrAnchor<void*>::determine_value(module);
+                    if(glob_ptr < (uint8_t*) module.base_addr() || (uint8_t*) module.base_addr() + module.size() <= glob_ptr) {
+                        std::string debug_str = ref_instr_anchor(module).debug_str();
+                        DevMsg("Obtained out-of-bounds global variable '%s' from anchor instruction %s: %p (module '%s': %p - %p)\n", m_Name, debug_str.c_str(), glob_ptr, module.name(), module.base_addr(), (uint8_t*) module.base_addr() + module.size());
+
+                        std::stringstream sstream;
+                        sstream << "Global variable anchor instruction " << ref_instr_anchor(module).debug_str() << " references OOB module address " << glob_ptr;
+                        throw std::runtime_error(sstream.str());
+                    }
+
+                    DevMsg("- &(%s) = %p\n", m_Name, glob_ptr);
+                    return SAnchor(&module, glob_ptr - (uint8_t*) module.base_addr(), m_Name);
+                }
+        };
+
+        struct SMemberOffAnchor : public IModuleFact<int>, SRefInstrAnchor<int> {
+            public:
+                SMemberOffAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_ptr_off) : SRefInstrAnchor(name, func, instr_off, instr_hex_seq, instr_ptr_off), m_Name(name) {}
+            
+                const char *fact_name() const { return m_Name; }
+
+            private:
+                const char *m_Name;
+
+                virtual int determine_value(CModule& module) {
+                    int member_off = SRefInstrAnchor<int>::determine_value(module);
+                    DevMsg("- offsetof(%s) = 0x%x\n", m_Name, member_off);
+                    return member_off;
+                }
+        };
 
         //>>>>> server anchors <<<<<
 
-        const SFuncAnchor UTIL_PlayerByIndex("39 50 14 7c 2e 8b 40 58 85 c0 74 22 c1 e2 04 01 d0 f6 00 02", 0xd);
+        namespace server {
+            extern SGlobVarAnchor g_pMatchFramework;
 
-        const SFuncAnchor FUNC_numSlots_adj("83 ec 0c 8b 10 50 ff 52 10 83 c4 10 89 c7 85 c0 74 12", 0x75);
+            extern SFuncAnchor UTIL_PlayerByIndex;
 
-        namespace CServerGameClients {
-            const SFuncAnchor GetPlayerLimits("83 ec 0c 8b 44 24 1c c7 00 01 00 00 00 8b 44 24 14 c7 00 01 00 00 00");
-        }
+            extern SFuncAnchor FUNC_numSlots_adj;
 
-        namespace CPortalMPGameRules {
-            const SFuncAnchor CPortalMPGameRules("83 c4 10 c7 87 30 02 00 00 00 00 00 00", 0x1a);
-            const SFuncAnchor destr_CPortalMPGameRules("89 d8 c1 e0 04 03 86 9c 1a 00 00 8b 50 08 c7 40 0c 00 00 00 00 85 d2", 0x70);
+            namespace CServerGameClients {
+                extern SFuncAnchor GetPlayerLimits;
+            }
 
-            const SFuncAnchor ClientCommandKeyValues("55 57 56 53 83 ec 3c 8b 44 24 50 8b 5c 24 58 89 44 24 04 8b 44 24 54 85 db");
-            const SFuncAnchor ClientDisconnected("55 57 56 53 83 ec 28 8b 44 24 3c 8b 7c 24 40 89 44 24 18 57");
+            namespace CPortalMPGameRules {
+                extern SFuncAnchor CPortalMPGameRules;
+                extern SFuncAnchor destr_CPortalMPGameRules;
 
-            const SFuncAnchor SetMapCompleteData("55 89 e5 57 56 53 81 ec 2c 01 00 00 8b 45 0c 83 f8 01");
-            const SFuncAnchor SendAllMapCompleteData("31 c0 b9 08 00 00 00 83 c4 10 8d 7d c8 ba 01 00 00 00 f3 ab 8b 45 08", 0x41);
-            const SFuncAnchor StartPlayerTransitionThinks("83 ec 08 be 41 08 00 00 31 ff 6a 00 6a 00 57 56 50 8d 44 24 24 50", 0x36);
-        }
+                extern SFuncAnchor ClientCommandKeyValues;
+                extern SFuncAnchor ClientDisconnected;
 
-        namespace CGameMovement {
-            const SFuncAnchor CheckStuck("8d 6c 24 30 83 ec 0c 8b 13 c6 83 6e 06 00 00 01 8d 7c 24 48 57", 0x1f);
-        }
+                extern SFuncAnchor SetMapCompleteData;
+                extern SFuncAnchor SendAllMapCompleteData;
+                extern SFuncAnchor StartPlayerTransitionThinks;
+            }
 
-        namespace CBaseEntity {
-            const SFuncAnchor ThinkSet("55 57 56 53 83 ec 1c 8b 74 24 44 f3 0f 7e 44 24 38");
-            const SFuncAnchor SetNextThink("f3 0f 10 44 24 34 8b 6c 24 30 0f 2e c1 8b 74 24 38", 0x7);
-        }
+            namespace CGameMovement {
+                extern SMemberOffAnchor m_LastStuck;
+                extern SFuncAnchor CheckStuck;
+            }
 
-        namespace CPortal_Player {
-            const SFuncAnchor destr_CPortal_Player();
+            namespace CBaseEntity {
+                extern SFuncAnchor ThinkSet;
+                extern SFuncAnchor SetNextThink;
+            }
 
-            const SFuncAnchor Spawn("8b 03 89 1c 24 ff 90 3c 08 00 00 83 c4 10 80 bb 10 0b 00 00 00", 0x62);
-            const SFuncAnchor ShouldCollide("53 8b 4c 24 08 8b 44 24 0c 8b 5c 24 10 8b 52 30", 0x6);
+            namespace CPortal_Player {
+                extern SFuncAnchor Spawn;
+                extern SFuncAnchor ShouldCollide;
 
-            const SFuncAnchor ClientCommand("55 89 e5 57 56 53 81 ec 9c 00 00 00 8b 7d 0c 8b 5d 08 8b 07 85 c0");
+                extern SFuncAnchor ClientCommand;
 
-            const SFuncAnchor OnFullyConnected("8b 5c 24 4c 8b 10 50 ff 92 88 00 00 00 83 c4 10 84 c0", 0xc);
+                extern SFuncAnchor OnFullyConnected;
 
-            const SFuncAnchor PlayerTransitionCompleteThink("8b 5c 24 28 8b 10 68 00 00 f8 3f 6a 00", 0xa);
-        }
+                extern SFuncAnchor PlayerTransitionCompleteThink;
+            }
 
-        namespace CProp_Portal {
-            const SFuncAnchor Spawn("53 83 ec 14 8b 5c 24 1c 8b 03 53 ff 50 68 89 1c 24"); //Only used to find g_pMatchFramework 
-        }
+            namespace CProp_Portal {
+                extern SFuncAnchor Spawn; //Only used to find g_pMatchFramework 
+            }
 
-        namespace CEnvFade {
-            const SFuncAnchor InputFade("89 c2 83 e2 01 29 d3 89 da 83 ca 04 a8 02 0f 45 da 89 da 83 ca 08 a8 08 0f 45 da a8 04", 0x16);
-            const SFuncAnchor InputReverseFade("89 c6 83 e6 01 83 c6 01 89 f2 83 ca 04 a8 02 0f 45 f2 89 f2 83 ca 08 a8 08 0f 45 f2", 0x20);
+            namespace CEnvFade {
+                extern SFuncAnchor InputFade;
+                extern SFuncAnchor InputReverseFade;
+            }
         }
 
         //>>>>> matchmaking anchors <<<<<
 
-        namespace CMatchTitleGameSettingsMgr {
-            const SFuncAnchor InitializeGameSettings("57 56 53 8b 5c 24 14 8b 74 24 18 83 ec 04");
+        namespace matchmaking {
+            namespace CMatchTitleGameSettingsMgr {
+                extern SFuncAnchor InitializeGameSettings;
+            }
         }
 
         //>>>>> engine anchors <<<<<
 
-        const SFuncAnchor SV_Frame("85 c0 74 14 89 f1 84 c9 74 0e 8b 10 83 ec 08 6a 01 50", 0x1f); //Only used to find the global sv variable
+        namespace engine {
+            extern SGlobVarAnchor sv;
 
-        namespace CGameServer {
-            const SFuncAnchor InitMaxClients("8b 5c 24 20 c7 44 24 04 01 00 00 00 c7 44 24 08 40 00 00 00", 0xa);
-        }
+            extern SFuncAnchor SV_Frame; //Only used to find the global sv variable
 
-        namespace KeyValues {
-            //Present in every lib as part of the static tier0 lib, but take it from the engine
-            //Don't just use the SDK's tier0, as it might have a different layout
-            const SFuncAnchor GetInt("83 c4 10 85 c0 74 1a 0f b6 50 10 80 fa 05 74 59 7f 17 80 fa 01 74 2a", 0x17);
+            namespace CGameServer {
+                extern SFuncAnchor InitMaxClients;
+            }
+
+            namespace KeyValues {
+                //Present in every lib as part of the static tier0 lib, but take it from the engine
+                //Don't just use the SDK's tier0, as it might have a different layout
+                extern SFuncAnchor GetInt;
+            }
         }
     }
 }

@@ -138,6 +138,11 @@ void CMPPatchPlugin::clear_patches() {
     for(const std::unique_ptr<IPatchRegistrar>& reg : m_PatchRegistrars) {
         reg->after_patch_status_change(*this, false);
     }
+
+    //Reset dependents
+    m_EngineModule->reset_dependents();
+    m_MatchMakingModule->reset_dependents();
+    m_ServerModule->reset_dependents();
 }
 
 void CMPPatchPlugin::Pause() {}
@@ -150,7 +155,6 @@ void CMPPatchPlugin::ServerActivate(edict_t *pEdictList, int edictCount, int cli
 void CMPPatchPlugin::GameFrame(bool simulating) {}
 
 void CMPPatchPlugin::ClientActive(edict_t *pEntity) {}
-void CMPPatchPlugin::ClientFullyConnect(edict_t *pEntity) {}
 void CMPPatchPlugin::ClientDisconnect(edict_t *pEntity) {}
 void CMPPatchPlugin::ClientPutInServer(edict_t *pEntity, char const *playername) {}
 void CMPPatchPlugin::SetCommandClient(int index) {}
@@ -165,4 +169,4 @@ void CMPPatchPlugin::OnEdictFreed(const edict_t *edict) {}
 
 //Module definition
 CMPPatchPlugin g_MPPatchPlugin;
-EXPOSE_SINGLE_INTERFACE_GLOBALVAR(CMPPatchPlugin, IServerPluginCallbacks, INTERFACEVERSION_ISERVERPLUGINCALLBACKS, g_MPPatchPlugin);
+EXPOSE_SINGLE_INTERFACE_GLOBALVAR(CMPPatchPlugin, IServerPluginCallbacks, INTERFACEVERSION_ISERVERPLUGINCALLBACKS_VERSION_1, g_MPPatchPlugin); //Lowest version to be safe

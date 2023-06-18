@@ -6,7 +6,6 @@
 #include "transitions_fix.hpp"
 #include "anchors.hpp"
 #include "vtab.hpp"
-#include "utils.hpp"
 
 using namespace patches;
 
@@ -24,31 +23,31 @@ void (*CTransitionsFixPatch::CPortalMPGameRules_StartPlayerTransitionThinks)(voi
 void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     //Find CPortalMPGameRules::CPortalMPGameRules and set m_bMapNamesLoaded to true by default
     //This causes the level_complete_data -> read_stats -> StartPlayerTransitionThinks cascade to happen for SP maps as well
-    SAnchor CPortalMPGameRules_CPortalMPGameRules = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::CPortalMPGameRules);
+    SAnchor CPortalMPGameRules_CPortalMPGameRules = anchors::server::CPortalMPGameRules::CPortalMPGameRules.get(plugin.server_module());
     plugin.register_patch<CPatch>(CPortalMPGameRules_CPortalMPGameRules + 0x3aa, new SEQ_HEX("80 bf bc 1b 00 00 00 0f 85 59 01 00 00"), new SEQ_HEX("c6 87 7c 02 00 00 01 90 90 90 90 90 90"));
 
     //Rewire the functionality of m_bDataReceived
     //This bool[2] array is used to track whether all players are ready during a transition
     //Replace it with an arbitrary-size ready tracker, reusing the 2 bytes as the uint16_t slot index
-    SAnchor CPortalMPGameRules_destr_CPortalMPGameRules = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::destr_CPortalMPGameRules);
-    SAnchor CPortalMPGameRules_ClientCommandKeyValues = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::ClientCommandKeyValues);
-    SAnchor CPortalMPGameRules_ClientDisconnected = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::ClientDisconnected);
-    SAnchor CPortalMPGameRules_SetMapCompleteData = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::SetMapCompleteData);
+    SAnchor CPortalMPGameRules_destr_CPortalMPGameRules = anchors::server::CPortalMPGameRules::destr_CPortalMPGameRules.get(plugin.server_module());
+    SAnchor CPortalMPGameRules_ClientCommandKeyValues = anchors::server::CPortalMPGameRules::ClientCommandKeyValues.get(plugin.server_module());
+    SAnchor CPortalMPGameRules_ClientDisconnected = anchors::server::CPortalMPGameRules::ClientDisconnected.get(plugin.server_module());
+    SAnchor CPortalMPGameRules_SetMapCompleteData = anchors::server::CPortalMPGameRules::SetMapCompleteData.get(plugin.server_module());
 
-    SAnchor CPortal_Player_Spawn = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortal_Player::Spawn);
-    SAnchor CPortal_Player_ClientCommand = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortal_Player::ClientCommand);
-    SAnchor CPortal_Player_OnFullyConnected = PATCH_FUNC_ANCHOR(plugin.server_module(), CPortal_Player::OnFullyConnected);
+    SAnchor CPortal_Player_Spawn = anchors::server::CPortal_Player::Spawn.get(plugin.server_module());
+    SAnchor CPortal_Player_ClientCommand = anchors::server::CPortal_Player::ClientCommand.get(plugin.server_module());
+    SAnchor CPortal_Player_OnFullyConnected = anchors::server::CPortal_Player::OnFullyConnected.get(plugin.server_module());
     //CPortal_Player::PlayerTransitionCompleteThink has already been patched, so it is no longer accessing m_bDataReceived
 
     // - find functions/globals we need to link to
     gpGlobals = plugin.get_globals();
-    glob_sv = (IServer*) get_engine_global_CBaseServer(plugin.engine_module());
-    ptr_g_pMatchFramework = get_server_global_g_pMatchFramework(plugin.server_module());
+    glob_sv = (IServer*) anchors::engine::sv.get(plugin.engine_module()).get_addr();
+    ptr_g_pMatchFramework = (void**) anchors::server::g_pMatchFramework.get(plugin.server_module()).get_addr();
 
-    UTIL_PlayerByIndex = (void *(*)(int)) PATCH_FUNC_ANCHOR(plugin.server_module(), UTIL_PlayerByIndex).get_addr();
-    KeyValues_GetInt = (int (*)(void*, const char*, int)) PATCH_FUNC_ANCHOR(plugin.engine_module(), KeyValues::GetInt).get_addr();
-    CPortalMPGameRules_SendAllMapCompleteData = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::SendAllMapCompleteData).get_addr();
-    CPortalMPGameRules_StartPlayerTransitionThinks = (void (*)(void*)) PATCH_FUNC_ANCHOR(plugin.server_module(), CPortalMPGameRules::StartPlayerTransitionThinks).get_addr();
+    UTIL_PlayerByIndex = (void *(*)(int)) anchors::server::UTIL_PlayerByIndex.get(plugin.server_module()).get_addr();
+    KeyValues_GetInt = (int (*)(void*, const char*, int)) anchors::engine::KeyValues::GetInt.get(plugin.engine_module()).get_addr();
+    CPortalMPGameRules_SendAllMapCompleteData = (void (*)(void*)) anchors::server::CPortalMPGameRules::SendAllMapCompleteData.get(plugin.server_module()).get_addr();
+    CPortalMPGameRules_StartPlayerTransitionThinks = (void (*)(void*)) anchors::server::CPortalMPGameRules::StartPlayerTransitionThinks.get(plugin.server_module()).get_addr();
 
     // - CPortalMPGameRules::~CPortalMPGameRules: detour to allocate the ready tracker
     plugin.register_patch<CPatch>(CPortalMPGameRules_CPortalMPGameRules + 0x316, new SEQ_HEX("66 89 8f 7d 1c 00 00"),

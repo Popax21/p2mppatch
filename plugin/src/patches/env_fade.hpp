@@ -13,10 +13,10 @@ namespace patches {
 
             virtual void register_patches(CMPPatchPlugin& plugin) {
                 //Patch CEnvFade to never apply a fade to all clients (ignoring SF_FADE_ONLYONE)
-                SAnchor CEnvFade_InputFade = PATCH_FUNC_ANCHOR(plugin.server_module(), CEnvFade::InputFade);
+                SAnchor CEnvFade_InputFade = anchors::server::CEnvFade::InputFade.get(plugin.server_module());
                 plugin.register_patch<CPatch>(CEnvFade_InputFade + 0x33, new SEQ_HEX("74 6b"), new SEQ_HEX("90 90"));
 
-                SAnchor CEnvFade_InputRevserFade = PATCH_FUNC_ANCHOR(plugin.server_module(), CEnvFade::InputReverseFade);
+                SAnchor CEnvFade_InputRevserFade = anchors::server::CEnvFade::InputReverseFade.get(plugin.server_module());
                 plugin.register_patch<CPatch>(CEnvFade_InputRevserFade + 0x109, new SEQ_HEX("0f 85 49 ff ff ff"), new SEQ_HEX("e9 85 49 ff ff ff"));
             }
     };
