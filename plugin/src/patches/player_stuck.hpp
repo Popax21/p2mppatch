@@ -16,7 +16,7 @@ namespace patches {
 
         private:
             static const int OFF_ConVar_boolValue = 0x30;
-            static int OFF_CBasePlayer_m_StuckLast;
+            static int OFF_CBaseEntity_m_MoveType, OFF_CBasePlayer_m_StuckLast;
 
             static CGlobalVars *gpGlobals;
             static void **ptr_g_pGameRules;
