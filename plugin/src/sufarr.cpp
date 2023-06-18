@@ -119,7 +119,7 @@ void CSuffixArray::sort_suffixes(size_t num_names) {
     }
 
     //Assign each bucket a start index
-    size_t bucket_idx = m_MaxNeedleSize, off_bucket_idx = m_MaxNeedleSize;
+    size_t bucket_idx = 0, off_bucket_idx = m_MaxNeedleSize;
     for(size_t i = 0; i < num_names; i++) {
         size_t name_cnt = m_BucketIdxs[i];
         m_BucketIdxs[i] = bucket_idx;
