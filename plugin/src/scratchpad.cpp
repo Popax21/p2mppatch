@@ -1,3 +1,4 @@
+#include <sstream>
 #include <stdexcept>
 #include <system_error>
 #include <tier0/dbg.h>
@@ -19,6 +20,19 @@ static inline void free_page(void *page) {
 #else
 #error Implement me!
 #endif
+
+CScratchPad::CScratchPad() : m_TotalSize(0) {
+    std::fill_n(m_Pages, MAX_SCRATCH_PAGES, nullptr);
+    std::fill_n(m_CurPageOff, MAX_SCRATCH_PAGES, 0);
+    std::fill_n(m_PageRefCnts, MAX_SCRATCH_PAGES, 0);
+
+    std::stringstream sstream;
+    for(int i = 0; i < MAX_SCRATCH_PAGES; i++) {
+        sstream.clear();
+        sstream << "scratch_page" << i;
+        m_PageNames[i] = sstream.str();
+    }
+}
 
 CScratchPad::SSeqEntry CScratchPad::alloc_seq(IByteSequence& seq) {
     size_t seq_size = seq.size();
@@ -52,6 +66,7 @@ CScratchPad::SSeqEntry CScratchPad::alloc_seq(IByteSequence& seq) {
 
     //Store the sequence in the scratchpad page
     SAnchor seq_anchor = SAnchor(m_Pages[page_idx] + m_CurPageOff[page_idx]);
+    seq_anchor.mark_symbol(m_PageNames[page_idx].c_str(), m_CurPageOff[page_idx]);
     m_CurPageOff[page_idx] += seq_size;
     m_PageRefCnts[page_idx]++;
     m_TotalSize += seq_size;

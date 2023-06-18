@@ -88,7 +88,7 @@ bool CDetour::apply_anchor(SAnchor anchor) {
 
     if(!m_DetourJumpSeq->apply_anchor(anchor)) return false;
     
-    std::string anchor_str = anchor.debug_str();
-    DevMsg("Prepared detour from %s to function at %p\n", anchor_str.c_str(), m_DetourFunc);
+    std::string anchor_str = anchor.debug_str(), scratchpad_str =  m_ScratchPadEntry.anchor().debug_str();
+    DevMsg("Prepared detour from %s to function at %p via scratchpad shim at %s\n", anchor_str.c_str(), m_DetourFunc, scratchpad_str.c_str());
     return true;
 }

@@ -40,11 +40,7 @@ class CScratchPad {
                 friend class CScratchPad;
         };
 
-        CScratchPad() : m_TotalSize(0) {
-            std::fill_n(m_Pages, MAX_SCRATCH_PAGES, nullptr);
-            std::fill_n(m_CurPageOff, MAX_SCRATCH_PAGES, 0);
-            std::fill_n(m_PageRefCnts, MAX_SCRATCH_PAGES, 0);
-        }
+        CScratchPad();
         CScratchPad(CScratchPad& o) = delete;
         CScratchPad(const CScratchPad& o) = delete;
         ~CScratchPad() { clear(); }
@@ -56,7 +52,9 @@ class CScratchPad {
 
     protected:
         size_t m_TotalSize;
+
         void *m_Pages[MAX_SCRATCH_PAGES];
+        std::string m_PageNames[MAX_SCRATCH_PAGES];
         size_t m_CurPageOff[MAX_SCRATCH_PAGES];
         int m_PageRefCnts[MAX_SCRATCH_PAGES];
 
