@@ -15,26 +15,36 @@ namespace patches {
             const int name##_IDX = idx; \
             typedef ret_type (*name##_FTYPE)(void *self, args);
 
+        //>>>>> server vtables <<<<<
+
+        namespace server {
+            namespace CGameRules {
+                PATCH_DECL_VTAB_FUNC(IsMultiplayer, 34, bool);
+            }
+        }
+
         //>>>>> matchmaking vtables <<<<<
 
-        namespace IMatchFramework {
-            PATCH_DECL_VTAB_FUNC(GetMatchSession, 12, void*);
-            PATCH_DECL_VTAB_FUNC(GetMatchNetworkMsgController, 13, void*);
-        }
+        namespace matchmaking {
+            namespace IMatchFramework {
+                PATCH_DECL_VTAB_FUNC(GetMatchSession, 12, void*);
+                PATCH_DECL_VTAB_FUNC(GetMatchNetworkMsgController, 13, void*);
+            }
 
-        namespace IMatchSession {
-            PATCH_DECL_VTAB_FUNC(GetSessionSystemData, 0, void*);
-            PATCH_DECL_VTAB_FUNC(GetSessionSettings, 1, void*);
-            PATCH_DECL_VTAB_FUNC_ARGS(UpdateSessionSettings, 2, void, void *pSettings);
-            PATCH_DECL_VTAB_FUNC_ARGS(Command, 3, void, void *pCommand);
-            PATCH_DECL_VTAB_FUNC(GetSessionID, 4, uint64_t);
-            PATCH_DECL_VTAB_FUNC_ARGS(UpdateTeamProperties, 5, void, void *pTeamProperties);
-        }
+            namespace IMatchSession {
+                PATCH_DECL_VTAB_FUNC(GetSessionSystemData, 0, void*);
+                PATCH_DECL_VTAB_FUNC(GetSessionSettings, 1, void*);
+                PATCH_DECL_VTAB_FUNC_ARGS(UpdateSessionSettings, 2, void, void *pSettings);
+                PATCH_DECL_VTAB_FUNC_ARGS(Command, 3, void, void *pCommand);
+                PATCH_DECL_VTAB_FUNC(GetSessionID, 4, uint64_t);
+                PATCH_DECL_VTAB_FUNC_ARGS(UpdateTeamProperties, 5, void, void *pTeamProperties);
+            }
 
-        namespace IMatchNetworkMsgController {
-            PATCH_DECL_VTAB_FUNC_ARGS(GetActiveServerGameDetails, 1, void*, void *pRequest);
-            PATCH_DECL_VTAB_FUNC_ARGS(UnpackGameDetailsFromSteamLobby, 3, void*, uint64_t uiLobbyI);
-            PATCH_DECL_VTAB_FUNC_ARGS(PackageGameDetailsForReservation, 5, void*, void *pSettings);
+            namespace IMatchNetworkMsgController {
+                PATCH_DECL_VTAB_FUNC_ARGS(GetActiveServerGameDetails, 1, void*, void *pRequest);
+                PATCH_DECL_VTAB_FUNC_ARGS(UnpackGameDetailsFromSteamLobby, 3, void*, uint64_t uiLobbyI);
+                PATCH_DECL_VTAB_FUNC_ARGS(PackageGameDetailsForReservation, 5, void*, void *pSettings);
+            }
         }
     }
 }

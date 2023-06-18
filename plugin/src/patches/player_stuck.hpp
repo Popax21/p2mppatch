@@ -2,9 +2,10 @@
 #define H_P2MPPATCH_PATCHES_PLAYER_STUCK
 
 #include <map>
-#include "plugin.hpp"
-#include "byteseq.hpp"
 #include "patch.hpp"
+
+class IServer;
+class CMPPatchPlugin;
 
 namespace patches {
     class CPlayerStuckPatch : public IPatchRegistrar {
@@ -16,6 +17,10 @@ namespace patches {
         private:
             static const int OFF_ConVar_boolValue = 0x30;
             static int OFF_CBasePlayer_m_StuckLast;
+
+            static CGlobalVars *gpGlobals;
+            static void **ptr_g_pGameRules;
+            static IServer *glob_sv;
 
             static void detour_CGameMovement_CheckStuck(void ***ptr_movement, int *ptr_retval, void **ptr_eip);
             static void detour_CPortal_Player_ShouldCollide(void **ptr_player, void **ptr_playerAvoidanceCvar, int *ptr_collisionGroup, int *ptr_shouldIgnorePlayerCol);

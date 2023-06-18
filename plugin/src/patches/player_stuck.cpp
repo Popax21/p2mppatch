@@ -1,18 +1,27 @@
 #include <tier0/dbg.h>
+#include <iserver.h>
 #include <const.h>
 #include <tier0/valve_minmax_off.h>
 
-#include <set>
 #include "detour.hpp"
+#include "plugin.hpp"
 #include "anchors.hpp"
 #include "player_stuck.hpp"
+#include "utils.hpp"
 
 using namespace patches;
 
 int CPlayerStuckPatch::OFF_CBasePlayer_m_StuckLast;
 
+CGlobalVars *CPlayerStuckPatch::gpGlobals;
+void **CPlayerStuckPatch::ptr_g_pGameRules;
+IServer *CPlayerStuckPatch::glob_sv;
+
 void CPlayerStuckPatch::register_patches(CMPPatchPlugin& plugin) {
     OFF_CBasePlayer_m_StuckLast = anchors::server::CGameMovement::m_LastStuck.get(plugin.server_module());
+    gpGlobals = plugin.get_globals();
+    ptr_g_pGameRules = (void**) anchors::server::g_pGameRules.get(plugin.server_module()).get_addr();
+    glob_sv = (IServer*) anchors::engine::sv.get(plugin.engine_module()).get_addr();
 
     //Detour the start of CGameMovement::CheckStuck
     SAnchor CGameMovement_CheckStuck = anchors::server::CGameMovement::CheckStuck.get(plugin.server_module());
@@ -32,6 +41,11 @@ void CPlayerStuckPatch::register_patches(CMPPatchPlugin& plugin) {
 static int ignore_inter_player_col = 0;
 
 void CPlayerStuckPatch::detour_CGameMovement_CheckStuck(void ***ptr_movement, int *ptr_retval, void **ptr_eip) {
+    //Check if we should intervene
+    if(glob_sv->GetNumClients() - glob_sv->GetNumProxies() <= (should_apply_sp_compat_patches(*ptr_g_pGameRules, gpGlobals) ? 1 : 2)) {
+        return;
+    }
+
     void **movement = *ptr_movement;
     void *player = movement[1];
     int& m_StuckLast = *(int*) ((uint8_t*) player + OFF_CBasePlayer_m_StuckLast);
@@ -59,11 +73,17 @@ void CPlayerStuckPatch::detour_CGameMovement_CheckStuck(void ***ptr_movement, in
 }
 
 void CPlayerStuckPatch::detour_CPortal_Player_ShouldCollide(void **ptr_player, void **ptr_playerAvoidanceCvar, int *ptr_collisionGroup, int *ptr_shouldIgnorePlayerCol) {
+    //Check if we should intervene
+    if(glob_sv->GetNumClients() - glob_sv->GetNumProxies() <= (should_apply_sp_compat_patches(*ptr_g_pGameRules, gpGlobals) ? 1 : 2)) {
+        *ptr_shouldIgnorePlayerCol = 0;
+        return;
+    }
+
     void *player = *ptr_player;
     void *playerAvoidanceCvar = *ptr_playerAvoidanceCvar;
     int collisionGroup = *ptr_collisionGroup;
     int& m_StuckLast = *(int*) ((uint8_t*) player + OFF_CBasePlayer_m_StuckLast);
-    DevMsg("DETOUR CPlayerStuckPatch | CPortal_Player::ShouldCollide | this=%p playerAvoidanceCvar=%p collisionGroup=%d m_StuckLast=%d ignore-col-timer=%d\n", player, playerAvoidanceCvar, collisionGroup, m_StuckLast, ignore_inter_player_col);
+    // DevMsg("DETOUR CPlayerStuckPatch | CPortal_Player::ShouldCollide | this=%p playerAvoidanceCvar=%p collisionGroup=%d m_StuckLast=%d ignore_col_timer=%d\n", player, playerAvoidanceCvar, collisionGroup, m_StuckLast, ignore_inter_player_col);
 
     //Get the value of the cvar
     if(*(uint32_t*) ((uint8_t*) playerAvoidanceCvar + OFF_ConVar_boolValue) != 0) {

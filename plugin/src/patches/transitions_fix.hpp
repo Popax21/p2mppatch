@@ -1,16 +1,12 @@
 #ifndef H_P2MPPATCH_PATCHES_TRANSITIONS_FIX
 #define H_P2MPPATCH_PATCHES_TRANSITIONS_FIX
 
-#include <iserver.h>
-#include <tier0/valve_minmax_off.h>
-
 #include <set>
-#include "plugin.hpp"
-#include "byteseq.hpp"
 #include "patch.hpp"
 #include "detour.hpp"
 
 class IServer;
+class CMPPatchPlugin;
 
 namespace patches {
     class CTransitionsFixPatch : public IPatchRegistrar {
@@ -22,7 +18,6 @@ namespace patches {
         private:
             static const int OFF_CPortalMPGameRules_m_bDataReceived = 0x1c7d;
 
-            static CGlobalVars *gpGlobals;
             static IServer *glob_sv;
             static void **ptr_g_pMatchFramework;
 
@@ -40,11 +35,7 @@ namespace patches {
 
                 void init_match_req_player_count();
 
-                int get_req_players() const {
-                    if(req_player_cnt >= 0) return req_player_cnt;
-                    return glob_sv->GetNumClients() - glob_sv->GetNumProxies();
-                }
-
+                int get_req_players() const;
                 bool is_everyone_ready() const;
             };
 

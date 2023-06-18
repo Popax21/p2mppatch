@@ -33,6 +33,7 @@ namespace patches {
         //>>>>> server anchors <<<<<
 
         namespace server {
+            SGlobVarAnchor g_pGameRules("g_pGameRules", CProp_Portal::DispatchPortalPlacementParticles, 0x9, "a1 ?? ?? ?? ??", 1);
             SGlobVarAnchor g_pMatchFramework("g_pMatchFramework", CProp_Portal::Spawn, 0x4c, "a1 ?? ?? ?? ??", 1);
 
             SFuncAnchor UTIL_PlayerByIndex("UTIL_PlayerByIndex", "39 50 14 7c 2e 8b 40 58 85 c0 74 22 c1 e2 04 01 d0 f6 00 02", 0xd);
@@ -77,7 +78,8 @@ namespace patches {
             }
 
             namespace CProp_Portal {
-                SFuncAnchor Spawn("CProp_Portal::Spawn", "53 83 ec 14 8b 5c 24 1c 8b 03 53 ff 50 68 89 1c 24"); //Only used to find g_pMatchFramework 
+                SFuncAnchor Spawn("CProp_Portal::Spawn", "53 83 ec 14 8b 5c 24 1c 8b 03 53 ff 50 68 89 1c 24");
+                SFuncAnchor DispatchPortalPlacementParticles("CProp_Portal::DispatchPortalPlacementParticles", "8b 5d 0c 8b 10 50 ff 92 88 00 00 00 83 c4 10 84 c0", 0xe);
             }
 
             namespace CEnvFade {
@@ -99,15 +101,13 @@ namespace patches {
         namespace engine {    
             SGlobVarAnchor sv("sv", SV_Frame, 0x4c, "68 ?? ?? ?? ??", 1);
 
-            SFuncAnchor SV_Frame("SV_Frame", "85 c0 74 14 89 f1 84 c9 74 0e 8b 10 83 ec 08 6a 01 50", 0x1f); //Only used to find the global sv variable
+            SFuncAnchor SV_Frame("SV_Frame", "85 c0 74 14 89 f1 84 c9 74 0e 8b 10 83 ec 08 6a 01 50", 0x1f);
 
             namespace CGameServer {
                 SFuncAnchor InitMaxClients("CGameServer::InitMaxClients", "8b 5c 24 20 c7 44 24 04 01 00 00 00 c7 44 24 08 40 00 00 00", 0xa);
             }
 
             namespace KeyValues {
-                //Present in every lib as part of the static tier0 lib, but take it from the engine
-                //Don't just use the SDK's tier0, as it might have a different layout
                 SFuncAnchor GetInt("KeyValues::GetInt", "83 c4 10 85 c0 74 1a 0f b6 50 10 80 fa 05 74 59 7f 17 80 fa 01 74 2a", 0x17);
             }
         }

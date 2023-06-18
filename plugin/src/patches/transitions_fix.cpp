@@ -1,8 +1,9 @@
 #include <tier0/dbg.h>
-#include <tier0/valve_minmax_off.h>
 #include <iserver.h>
+#include <tier0/valve_minmax_off.h>
 
 #include "byteseq.hpp"
+#include "plugin.hpp"
 #include "transitions_fix.hpp"
 #include "anchors.hpp"
 #include "vtab.hpp"
@@ -11,7 +12,6 @@ using namespace patches;
 
 CTransitionsFixPatch::SReadyTracker *CTransitionsFixPatch::tracker_slots[NUM_TRACKER_SLOTS];
 
-CGlobalVars *CTransitionsFixPatch::gpGlobals;
 IServer *CTransitionsFixPatch::glob_sv;
 void **CTransitionsFixPatch::ptr_g_pMatchFramework;
 
@@ -40,7 +40,6 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     //CPortal_Player::PlayerTransitionCompleteThink has already been patched, so it is no longer accessing m_bDataReceived
 
     // - find functions/globals we need to link to
-    gpGlobals = plugin.get_globals();
     glob_sv = (IServer*) anchors::engine::sv.get(plugin.engine_module()).get_addr();
     ptr_g_pMatchFramework = (void**) anchors::server::g_pMatchFramework.get(plugin.server_module()).get_addr();
 
@@ -112,13 +111,13 @@ void CTransitionsFixPatch::SReadyTracker::init_match_req_player_count() {
         return;
     }
 
-    void *match_session = PATCH_VTAB_FUNC(g_pMatchFramework, IMatchFramework::GetMatchSession)(g_pMatchFramework);
+    void *match_session = PATCH_VTAB_FUNC(g_pMatchFramework, matchmaking::IMatchFramework::GetMatchSession)(g_pMatchFramework);
     if(!match_session) {
         DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession() = nullptr\n");
         return;
     }
 
-    void *session_settings = PATCH_VTAB_FUNC(match_session, IMatchSession::GetSessionSettings)(match_session);
+    void *session_settings = PATCH_VTAB_FUNC(match_session, matchmaking::IMatchSession::GetSessionSettings)(match_session);
     if(!session_settings) {
         DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings() = nullptr\n");
         return;
@@ -126,6 +125,11 @@ void CTransitionsFixPatch::SReadyTracker::init_match_req_player_count() {
 
     req_player_cnt = KeyValues_GetInt(session_settings, "members/numPlayers", -1);
     DevMsg("CTransitionsFixPatch | g_pMatchFramework->GetMatchSession()->GetSessionSettings()->GetInt(\"members/numPlayers\") = %d\n", req_player_cnt);
+}
+
+int CTransitionsFixPatch::SReadyTracker::get_req_players() const {
+    if(req_player_cnt >= 0) return req_player_cnt;
+    return glob_sv->GetNumClients() - glob_sv->GetNumProxies();
 }
 
 bool CTransitionsFixPatch::SReadyTracker::is_everyone_ready() const {

@@ -93,6 +93,7 @@ namespace patches {
         //>>>>> server anchors <<<<<
 
         namespace server {
+            extern SGlobVarAnchor g_pGameRules;
             extern SGlobVarAnchor g_pMatchFramework;
 
             extern SFuncAnchor UTIL_PlayerByIndex;
@@ -138,6 +139,7 @@ namespace patches {
 
             namespace CProp_Portal {
                 extern SFuncAnchor Spawn; //Only used to find g_pMatchFramework 
+                extern SFuncAnchor DispatchPortalPlacementParticles; //Only used to find g_pGameRules
             }
 
             namespace CEnvFade {
@@ -165,9 +167,9 @@ namespace patches {
                 extern SFuncAnchor InitMaxClients;
             }
 
+            //Present in every lib as part of the static tier0 lib, but take it from the engine
+            //Don't just use the SDK's tier0, as it might have a different layout
             namespace KeyValues {
-                //Present in every lib as part of the static tier0 lib, but take it from the engine
-                //Don't just use the SDK's tier0, as it might have a different layout
                 extern SFuncAnchor GetInt;
             }
         }
