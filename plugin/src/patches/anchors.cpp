@@ -44,6 +44,8 @@ namespace patches::anchors {
         }
 
         namespace CPortalMPGameRules {
+            SMemberOffAnchor m_bDataReceived("CPortalMPGameRules::m_bDataReceived", CPortalMPGameRules, 0x316, "66 89 8f ?? ?? ?? ??", 3);
+
             SFuncAnchor CPortalMPGameRules("CPortalMPGameRules::CPortalMPGameRules", "83 c4 10 c7 87 30 02 00 00 00 00 00 00", 0x1a);
             SFuncAnchor destr_CPortalMPGameRules("CPortalMPGameRules::~CPortalMPGameRules", "89 d8 c1 e0 04 03 86 9c 1a 00 00 8b 50 08 c7 40 0c 00 00 00 00 85 d2", 0x70);
 

@@ -16,7 +16,7 @@ namespace patches {
             virtual void register_patches(CMPPatchPlugin& plugin);
 
         private:
-            static const int OFF_CPortalMPGameRules_m_bDataReceived = 0x1c7d;
+            static int OFF_CPortalMPGameRules_m_bDataReceived;
 
             static IServer *glob_sv;
             static void **ptr_g_pMatchFramework;

@@ -23,10 +23,16 @@ namespace patches::anchors {
             int m_Offset;
 
             virtual SAnchor determine_value(CModule& module) {
-                SAnchor anchor = module.find_seq_anchor(m_Sequence) - m_Offset;
-                DevMsg("- &(%s) = %p\n", m_Name, anchor.get_addr());
-                anchor.mark_symbol(m_Name);
-                return anchor;
+                try {
+                    SAnchor anchor = module.find_seq_anchor(m_Sequence) - m_Offset;
+                    DevMsg("- &(%s) = %p\n", m_Name, anchor.get_addr());
+                    anchor.mark_symbol(m_Name);
+                    return anchor;
+                } catch(const std::exception& e) {
+                    std::stringstream sstream;
+                    sstream << "Failed to resolve function '" << m_Name << "': " << e.what();
+                    throw std::runtime_error(sstream.str());
+                }
             }
     };
 
@@ -104,6 +110,8 @@ namespace patches::anchors {
         }
 
         namespace CPortalMPGameRules {
+            extern SMemberOffAnchor m_bDataReceived;
+
             extern SFuncAnchor CPortalMPGameRules;
             extern SFuncAnchor destr_CPortalMPGameRules;
 

@@ -11,8 +11,7 @@
 
 using namespace patches;
 
-int CPlayerStuckPatch::OFF_CBaseEntity_m_MoveType;
-int CPlayerStuckPatch::OFF_CBasePlayer_m_StuckLast;
+int CPlayerStuckPatch::OFF_ConVar_boolValue, CPlayerStuckPatch::OFF_CBaseEntity_m_MoveType, CPlayerStuckPatch::OFF_CBasePlayer_m_StuckLast;
 
 CGlobalVars *CPlayerStuckPatch::gpGlobals;
 void **CPlayerStuckPatch::ptr_g_pGameRules;
@@ -33,12 +32,12 @@ void CPlayerStuckPatch::register_patches(CMPPatchPlugin& plugin) {
     );
 
     //Detour the portal_use_player_avoidance cvar check in CPortal_Player::ShouldCollide
-    uint8_t bool_val_off = (uint8_t) OFF_ConVar_boolValue;
     SAnchor CPortal_Player_ShouldCollide = anchors::server::CPortal_Player::ShouldCollide.get(plugin.server_module());
-    plugin.register_patch<CPatch>(CPortal_Player_ShouldCollide + 0xb, new SEQ_HEX("8b 44 24 0c 8b 5c 24 10 8b 52 $1", &bool_val_off), new SEQ_SEQ(
+    plugin.register_patch<CPatch>(CPortal_Player_ShouldCollide + 0xb, new SEQ_MASKED_HEX("8b 44 24 0c 8b 5c 24 10 8b 52 ??"), new SEQ_SEQ(
         new SEQ_DETOUR_COPY_ORIG(plugin, 8, detour_CPortal_Player_ShouldCollide, DETOUR_ARG_ECX, DETOUR_ARG_EDX, DETOUR_ARG_EAX, DETOUR_ARG_EDX),
         new SEQ_FILL(3, 0x90)
     ));
+    OFF_ConVar_boolValue = *((uint8_t*) CPortal_Player_ShouldCollide.get_addr() + 0xb + 10);
 }
 
 enum {

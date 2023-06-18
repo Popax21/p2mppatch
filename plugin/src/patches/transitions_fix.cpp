@@ -12,6 +12,8 @@ using namespace patches;
 
 CTransitionsFixPatch::SReadyTracker *CTransitionsFixPatch::tracker_slots[NUM_TRACKER_SLOTS];
 
+int CTransitionsFixPatch::OFF_CPortalMPGameRules_m_bDataReceived;
+
 IServer *CTransitionsFixPatch::glob_sv;
 void **CTransitionsFixPatch::ptr_g_pMatchFramework;
 
@@ -21,6 +23,8 @@ void (*CTransitionsFixPatch::CPortalMPGameRules_SendAllMapCompleteData)(void*);
 void (*CTransitionsFixPatch::CPortalMPGameRules_StartPlayerTransitionThinks)(void*);
 
 void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
+    OFF_CPortalMPGameRules_m_bDataReceived = anchors::server::CPortalMPGameRules::m_bDataReceived.get(plugin.server_module());
+
     //Find CPortalMPGameRules::CPortalMPGameRules and set m_bMapNamesLoaded to true by default
     //This causes the level_complete_data -> read_stats -> StartPlayerTransitionThinks cascade to happen for SP maps as well
     SAnchor CPortalMPGameRules_CPortalMPGameRules = anchors::server::CPortalMPGameRules::CPortalMPGameRules.get(plugin.server_module());
@@ -48,8 +52,8 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     CPortalMPGameRules_SendAllMapCompleteData = (void (*)(void*)) anchors::server::CPortalMPGameRules::SendAllMapCompleteData.get(plugin.server_module()).get_addr();
     CPortalMPGameRules_StartPlayerTransitionThinks = (void (*)(void*)) anchors::server::CPortalMPGameRules::StartPlayerTransitionThinks.get(plugin.server_module()).get_addr();
 
-    // - CPortalMPGameRules::~CPortalMPGameRules: detour to allocate the ready tracker
-    plugin.register_patch<CPatch>(CPortalMPGameRules_CPortalMPGameRules + 0x316, new SEQ_HEX("66 89 8f 7d 1c 00 00"),
+    // - CPortalMPGameRules::CPortalMPGameRules: detour to allocate the ready tracker
+    plugin.register_patch<CPatch>(CPortalMPGameRules_CPortalMPGameRules + 0x316, new SEQ_MASKED_HEX("66 89 8f ?? ?? ?? ??"),
         new SEQ_DETOUR(plugin, 7, detour_CPortalMPGameRules_CPortalMPGameRules, DETOUR_ARG_EDI)
     );
 
