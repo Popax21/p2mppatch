@@ -11,7 +11,7 @@ namespace patches {
         public:
             virtual const char *name() const override { return "dc_check"; }
 
-            virtual void register_patches(CMPPatchPlugin& plugin) {
+            virtual void register_patches(CMPPatchPlugin& plugin) override {
                 //Find CPortalMPGameRules::ClientDisconnected and remove the disconnect check
                 SAnchor CPortalMPGameRules_ClientDisconnected = anchors::server::CPortalMPGameRules::ClientDisconnected.get(plugin.server_module());
                 plugin.register_patch<CPatch>(CPortalMPGameRules_ClientDisconnected + 0x8d, new SEQ_HEX("74"), new SEQ_HEX("eb"));

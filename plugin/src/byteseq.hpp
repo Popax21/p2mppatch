@@ -56,7 +56,6 @@ class CSequentialByteSequence : public IByteSequence {
             for(IByteSequence *seq : seqs) add_sequence(seq);
         }
         CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size) { m_Sequences = std::move(seq.m_Sequences); }
-        ~CSequentialByteSequence() {}
 
         void add_sequence(IByteSequence* ptr) {
             m_Sequences.emplace_back(m_Size, std::unique_ptr<IByteSequence>(ptr));
@@ -69,15 +68,15 @@ class CSequentialByteSequence : public IByteSequence {
             return *seq;
         }
 
-        virtual size_t size() const { return m_Size; };
+        virtual size_t size() const override { return m_Size; };
 
-        virtual bool apply_anchor(SAnchor anchor);
+        virtual bool apply_anchor(SAnchor anchor) override;
 
-        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
-        virtual int compare(const uint8_t *buf, size_t off, size_t size) const;
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const;
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override;
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const override;
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override;
 
-        inline virtual uint8_t operator [](size_t off) const {
+        inline virtual uint8_t operator [](size_t off) const override {
             const seq_ent& ent = get_sequence(off);
             return (*ent.seq)[off - ent.off];
         }
@@ -101,14 +100,14 @@ class CIgnoreSequence : public IByteSequence {
     public:
         CIgnoreSequence(size_t size) : m_Size(size) {}
 
-        virtual bool has_data() const { return false; }
-        virtual size_t size() const { return m_Size; };
+        virtual bool has_data() const override { return false; }
+        virtual size_t size() const override { return m_Size; };
 
-        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const { return 0; }
-        virtual int compare(const uint8_t *buf, size_t off, size_t size) const { return 0; }
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override { return 0; }
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const override { return 0; }
 
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { throw std::runtime_error("Can't access the data of an CIgnoreSequence"); }
-        inline virtual uint8_t operator [](size_t off) const { return 0x42; }
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override { throw std::runtime_error("Can't access the data of an CIgnoreSequence"); }
+        inline virtual uint8_t operator [](size_t off) const override { return 0x42; }
 
     private:
         size_t m_Size;
@@ -119,9 +118,9 @@ class CFillSequence : public IByteSequence {
     public:
         CFillSequence(size_t size, uint8_t fill) : m_Size(size), m_Fill(fill) {}
 
-        virtual size_t size() const { return m_Size; };
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memset(buf, m_Fill, size); }
-        inline virtual uint8_t operator [](size_t off) const{ return m_Fill; }
+        virtual size_t size() const override { return m_Size; };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override { memset(buf, m_Fill, size); }
+        inline virtual uint8_t operator [](size_t off) const override { return m_Fill; }
 
     private:
         size_t m_Size;
@@ -132,10 +131,10 @@ class CArraySequence : public IByteSequence {
     public:
         CArraySequence(const uint8_t *data, size_t size) : m_Data(data), m_Size(size) {}
 
-        virtual size_t size() const { return m_Size; };
-        virtual const uint8_t *buffer() const { return m_Data; };
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memcpy(buf, m_Data+off, size); }
-        virtual uint8_t operator [](size_t off) const { return m_Data[off]; }
+        virtual size_t size() const override { return m_Size; };
+        virtual const uint8_t *buffer() const override { return m_Data; };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override { memcpy(buf, m_Data+off, size); }
+        virtual uint8_t operator [](size_t off) const override { return m_Data[off]; }
 
     private:
         const uint8_t *m_Data;
@@ -150,10 +149,10 @@ class CVectorSequence : public IByteSequence {
 
         inline void push_back(uint8_t byte) { m_Data.push_back(byte); }
 
-        virtual size_t size() const { return m_Data.size(); };
-        virtual const uint8_t *buffer() const { return m_Data.data(); };
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memcpy(buf, m_Data.data()+off, size); }
-        virtual uint8_t operator [](size_t off) const { return m_Data[off]; }
+        virtual size_t size() const override { return m_Data.size(); };
+        virtual const uint8_t *buffer() const override { return m_Data.data(); };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override { memcpy(buf, m_Data.data()+off, size); }
+        virtual uint8_t operator [](size_t off) const override { return m_Data[off]; }
 
     private:
         std::vector<uint8_t> m_Data;
@@ -165,10 +164,10 @@ class CHexSequence : public IByteSequence {
         CHexSequence(const CHexSequence &seq);
         virtual ~CHexSequence();
 
-        virtual size_t size() const { return m_Size; };
-        virtual const uint8_t *buffer() const { return m_Data; };
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memcpy(buf, m_Data+off, size); }
-        virtual uint8_t operator [](size_t off) const { return m_Data[off]; }
+        virtual size_t size() const override { return m_Size; };
+        virtual const uint8_t *buffer() const override { return m_Data; };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override { memcpy(buf, m_Data+off, size); }
+        virtual uint8_t operator [](size_t off) const override { return m_Data[off]; }
 
     protected:
         uint8_t *m_Data;
@@ -181,14 +180,14 @@ class CMaskedHexSequence : public IByteSequence {
         CMaskedHexSequence(const CMaskedHexSequence &seq);
         virtual ~CMaskedHexSequence();
 
-        virtual bool has_data() const { return false; }
-        virtual size_t size() const { return m_Size; };
+        virtual bool has_data() const override { return false; }
+        virtual size_t size() const override { return m_Size; };
 
-        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const;
-        virtual int compare(const uint8_t *buf, size_t off, size_t size) const;
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override;
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const override;
 
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { throw std::runtime_error("Can't access the data of an CMaskedHexSequence"); }
-        virtual uint8_t operator [](size_t off) const { return 0x42; }
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override { throw std::runtime_error("Can't access the data of a CMaskedHexSequence"); }
+        virtual uint8_t operator [](size_t off) const override { return 0x42; }
 
     protected:
         uint8_t *m_Data, *m_DataMask;
@@ -199,10 +198,10 @@ class CStringSequence : public IByteSequence {
     public:
         CStringSequence(const char *str) : m_String(str), m_Size(strlen(str)) {}
 
-        virtual size_t size() const { return m_Size; };
-        virtual const uint8_t *buffer() const { return (const uint8_t*) m_String; };
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const { memcpy(buf, m_String+off, size); }
-        virtual uint8_t operator [](size_t off) const { return (uint8_t) m_String[off]; }
+        virtual size_t size() const override { return m_Size; };
+        virtual const uint8_t *buffer() const override { return (const uint8_t*) m_String; };
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override { memcpy(buf, m_String+off, size); }
+        virtual uint8_t operator [](size_t off) const override { return (uint8_t) m_String[off]; }
 
     private:
         const char *m_String;
@@ -213,20 +212,20 @@ class CRefInstructionSequence : public IByteSequence {
     public:
         CRefInstructionSequence(std::vector<uint8_t> opcode, SAnchor anchor) : m_Opcode(opcode), m_RefAnchor(anchor), m_IsAnchored(false) {}
 
-        virtual size_t size() const { return m_Opcode.size() + sizeof(size_t); };
+        virtual size_t size() const override { return m_Opcode.size() + sizeof(size_t); };
 
-        virtual bool apply_anchor(SAnchor anchor) {
+        virtual bool apply_anchor(SAnchor anchor) override {
             if(m_IsAnchored) throw std::runtime_error("CRefInstructionSequence is already anchored");
             m_IsAnchored = true;
             m_InstrAnchor = anchor;
             return true;
         }
 
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const {
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override {
             while(size-- > 0) *(buf++) = (*this)[off++];
         }
 
-        virtual uint8_t operator [](size_t off) const {
+        virtual uint8_t operator [](size_t off) const override {
             if(!m_IsAnchored) throw std::runtime_error("Can't access content of CRefInstructionSequence when not anchored");
             if(off < m_Opcode.size()) return m_Opcode[off];
 

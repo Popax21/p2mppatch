@@ -11,9 +11,9 @@ class CMPPatchPlugin;
 namespace patches {
     class CTransitionsFixPatch : public IPatchRegistrar {
         public:
-            virtual const char *name() const { return "transitions_fix"; }
+            virtual const char *name() const override { return "transitions_fix"; }
 
-            virtual void register_patches(CMPPatchPlugin& plugin);
+            virtual void register_patches(CMPPatchPlugin& plugin) override;
 
         private:
             static int OFF_CPortalMPGameRules_m_bDataReceived;

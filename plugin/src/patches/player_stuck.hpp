@@ -10,9 +10,9 @@ class CMPPatchPlugin;
 namespace patches {
     class CPlayerStuckPatch : public IPatchRegistrar {
         public:
-            virtual const char *name() const { return "player_stuck"; }
+            virtual const char *name() const override { return "player_stuck"; }
 
-            virtual void register_patches(CMPPatchPlugin& plugin);
+            virtual void register_patches(CMPPatchPlugin& plugin) override;
 
         private:
             static int OFF_ConVar_boolValue, OFF_CBaseEntity_m_MoveType, OFF_CBasePlayer_m_StuckLast;

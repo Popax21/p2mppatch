@@ -9,9 +9,9 @@
 namespace patches {
     class CEnvFadePatch : public IPatchRegistrar {
         public:
-            virtual const char *name() const { return "env_fade"; }
+            virtual const char *name() const override { return "env_fade"; }
 
-            virtual void register_patches(CMPPatchPlugin& plugin) {
+            virtual void register_patches(CMPPatchPlugin& plugin) override {
                 //Patch CEnvFade to never apply a fade to all clients (ignoring SF_FADE_ONLYONE)
                 //We can get away with not checking whether we should intervene because these should only apply in the SP campaign
                 SAnchor CEnvFade_InputFade = anchors::server::CEnvFade::InputFade.get(plugin.server_module());

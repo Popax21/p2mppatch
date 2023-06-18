@@ -11,9 +11,9 @@ namespace patches {
         public:
             CPlayerCountPatch(uint8_t max_players) : m_MaxPlayers(max_players) {}
 
-            virtual const char *name() const { return "player_count"; }
+            virtual const char *name() const override { return "player_count"; }
 
-            virtual void register_patches(CMPPatchPlugin& plugin) {
+            virtual void register_patches(CMPPatchPlugin& plugin) override {
                 //Find CServerGameClients::GetPlayerLimits and patch maxplayers and defaultmaxplayers values
                 uint8_t max_players_p1 = m_MaxPlayers + 1;
                 SAnchor CServerGameClients_GetPlayerLimits = anchors::server::CServerGameClients::GetPlayerLimits.get(plugin.server_module());
@@ -31,9 +31,9 @@ namespace patches {
                 plugin.register_patch<CPatch>(CMatchTitleGameSettingsMgr_InitializeGameSettings + 0x172, new SEQ_HEX("b8 01 00 00 00"), new SEQ_HEX("b8 $1 00 00 00", { &m_MaxPlayers }));
             }
 
-            virtual void after_patch_status_change(CMPPatchPlugin& plugin, bool applied) {
+            virtual void after_patch_status_change(CMPPatchPlugin& plugin, bool applied) override {
                 //Invoke CGameServer::InitMaxClients to update the internal lower/upper maxplayers limits
-                Msg("Invoking CGameServer::InitMaxClients...\n");
+                DevMsg("Invoking CGameServer::InitMaxClients...\n");
                 SAnchor CGameServer_InitMaxClients = anchors::engine::CGameServer::InitMaxClients.get(plugin.engine_module());
                 ((void *(*)(void*)) CGameServer_InitMaxClients.get_addr())(anchors::engine::sv.get(plugin.engine_module()).get_addr());
             }

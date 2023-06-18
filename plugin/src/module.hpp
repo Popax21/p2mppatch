@@ -14,6 +14,8 @@ class CModule;
 
 class IModuleDependent {
     protected:
+        ~IModuleDependent() {}
+
         virtual void associate(CModule& module) = 0;
         virtual void reset() = 0;
 
@@ -99,19 +101,21 @@ template<typename T> class IModuleFact : IModuleDependent {
         }
 
     protected:
+        ~IModuleFact() {}
+
         virtual T determine_value(CModule& module) = 0;
 
     private:
         CModule *m_Module;
         T m_Value;
 
-        virtual void associate(CModule& module) {
+        virtual void associate(CModule& module) override {
             m_Value = determine_value(module);
             m_Module = &module;
             DevMsg("Associated IModuleFact '%s' with module '%s'\n", fact_name(), m_Module->name());
         }
 
-        virtual void reset() {
+        virtual void reset() override {
             m_Module = nullptr;
             m_Value = T();
         }

@@ -15,14 +15,14 @@ namespace patches::anchors {
         public:
             SFuncAnchor(const char *name, const char *hex_seq, int off = 0) : m_Name(name), m_Sequence(hex_seq), m_Offset(off) {}
 
-            const char *fact_name() const { return m_Name; }
+            const char *fact_name() const override { return m_Name; }
 
         private:
             const char *m_Name;
             CHexSequence m_Sequence;
             int m_Offset;
 
-            virtual SAnchor determine_value(CModule& module) {
+            virtual SAnchor determine_value(CModule& module) override {
                 try {
                     SAnchor anchor = module.find_seq_anchor(m_Sequence) - m_Offset;
                     DevMsg("- &(%s) = %p\n", m_Name, anchor.get_addr());
@@ -37,7 +37,7 @@ namespace patches::anchors {
     };
 
     template<typename T> struct SRefInstrAnchor {
-        static_assert(std::is_same<T, uint8_t>::value || std::is_same<T, uint16_t>::value || std::is_same<T, int>::value || std::is_same<T, void*>::value, "SRefInstrAnchor can only work on primitive types");
+        static_assert(std::is_same<T, uint8_t>::value || std::is_same<T, uint16_t>::value || std::is_same<T, int>::value || std::is_same<T, void*>::value, "SRefInstrAnchor only works with primitive types");
 
         public:
             SRefInstrAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_val_off) : m_Name(name), m_Func(func), m_RefInstrOffset(instr_off), m_RefInstrSequence(instr_hex_seq), m_RefInstrValOff(instr_val_off) {}
@@ -57,12 +57,12 @@ namespace patches::anchors {
         public:
             SGlobVarAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_ptr_off) : SRefInstrAnchor(name, func, instr_off, instr_hex_seq, instr_ptr_off), m_Name(name) {}
 
-            const char *fact_name() const { return m_Name; }
+            const char *fact_name() const override { return m_Name; }
 
         private:
             const char *m_Name;
 
-            virtual SAnchor determine_value(CModule& module) {
+            virtual SAnchor determine_value(CModule& module) override {
                 //Obtain and check the global pointer from the instruction
                 uint8_t *glob_ptr = (uint8_t*) SRefInstrAnchor<void*>::determine_value(module);
                 if(glob_ptr < (uint8_t*) module.base_addr() || (uint8_t*) module.base_addr() + module.size() <= glob_ptr) {
@@ -83,12 +83,12 @@ namespace patches::anchors {
         public:
             SMemberOffAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_ptr_off) : SRefInstrAnchor(name, func, instr_off, instr_hex_seq, instr_ptr_off), m_Name(name) {}
         
-            const char *fact_name() const { return m_Name; }
+            const char *fact_name() const override { return m_Name; }
 
         private:
             const char *m_Name;
 
-            virtual int determine_value(CModule& module) {
+            virtual int determine_value(CModule& module) override {
                 int member_off = SRefInstrAnchor<int>::determine_value(module);
                 DevMsg("- offsetof(%s) = 0x%x\n", m_Name, member_off);
                 return member_off;
