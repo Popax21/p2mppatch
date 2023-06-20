@@ -7,15 +7,14 @@ template<typename T> T SRefInstrAnchor<T>::determine_value(CModule& module) cons
     SAnchor ref_instr = ref_instr_anchor(module);
     uint8_t *ref_instr_ptr = (uint8_t*) ref_instr.get_addr();
     if(m_RefInstrSequence.compare(ref_instr_ptr, 0, m_RefInstrSequence.size()) != 0) {
-        std::string debug_str = ref_instr.debug_str();
-        DevWarning("Mismatching global variable '%s' anchor instruction %s: ", m_Name, debug_str.c_str());
+        DevWarning("Mismatching global variable '%s' anchor instruction %s: ", m_Name, ref_instr.debug_str().c_str());
         for(size_t i = 0; i < m_RefInstrSequence.size(); i++) DevWarning("%02x", m_RefInstrSequence[i]);
         DevWarning(" != ");
         for(size_t i = 0; i < m_RefInstrSequence.size(); i++) DevWarning("%02x", ref_instr_ptr[i]);
         DevWarning("\n");
 
         std::stringstream sstream;
-        sstream << "Global variable anchor instruction " << debug_str << " doesn't match target [" << m_RefInstrSequence.size() << " bytes]";
+        sstream << "Global variable anchor instruction " << ref_instr << " doesn't match target [" << m_RefInstrSequence.size() << " bytes]";
         throw std::runtime_error(sstream.str());
     }
 

@@ -32,7 +32,7 @@ class CModule : public IByteSequence {
                 CUnprotector(CModule *mod) : m_Module(mod) {
                     if(mod) mod->unprotect();
                 }
-                CUnprotector(CUnprotector& prot) = delete;
+                CUnprotector(CUnprotector&& prot) = delete;
                 CUnprotector(const CUnprotector& prot) = delete;
                 ~CUnprotector() { finalize(); }
 
@@ -51,7 +51,7 @@ class CModule : public IByteSequence {
         };
 
         CModule(const char *name);
-        CModule(CModule& mod) = delete;
+        CModule(CModule&& mod) = delete;
         CModule(const CModule& mod) = delete;
         ~CModule();
 

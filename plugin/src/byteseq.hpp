@@ -57,12 +57,12 @@ class CSequentialByteSequence : public IByteSequence {
         }
         CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size) { m_Sequences = std::move(seq.m_Sequences); }
 
-        void add_sequence(IByteSequence* ptr) {
-            m_Sequences.emplace_back(m_Size, std::unique_ptr<IByteSequence>(ptr));
+        inline void add_sequence(IByteSequence *ptr, bool owned=true) {
+            m_Sequences.push_back(seq_ent(m_Size, ptr, owned));
             m_Size += ptr->size();
         }
 
-        template<typename SeqType, typename... Args> SeqType& emplace_sequence(Args... args) {
+        template<typename SeqType, typename... Args> inline SeqType& emplace_sequence(Args... args) {
             SeqType *seq = new SeqType(args...);
             add_sequence(seq);
             return *seq;
@@ -84,10 +84,24 @@ class CSequentialByteSequence : public IByteSequence {
     private:
         struct seq_ent {
             size_t off;
-            std::unique_ptr<IByteSequence> seq;
+            IByteSequence *seq;
+            bool owns_seq;
 
-            inline seq_ent() : off(0), seq(nullptr) {}
-            inline seq_ent(size_t off, std::unique_ptr<IByteSequence> seq) : off(off), seq(std::move(seq)) {}
+            seq_ent() : off(0), seq(nullptr), owns_seq(false) {}
+            seq_ent(size_t off, IByteSequence *seq, bool owns_seq) : off(off), seq(seq), owns_seq(owns_seq) {}
+
+            seq_ent(seq_ent&& ent) {
+                off = ent.off;
+                seq = ent.seq;
+                owns_seq = ent.owns_seq;
+                ent.seq = nullptr;
+            }
+            seq_ent(const seq_ent& ent) = delete;
+
+            ~seq_ent() {
+                if(owns_seq) delete seq;
+                seq = nullptr;
+            }
         };
 
         const seq_ent& get_sequence(size_t off) const;
@@ -127,9 +141,9 @@ class CFillSequence : public IByteSequence {
         uint8_t m_Fill;
 };
 
-class CArraySequence : public IByteSequence {
+class CBufferSequence : public IByteSequence {
     public:
-        CArraySequence(const uint8_t *data, size_t size) : m_Data(data), m_Size(size) {}
+        CBufferSequence(const uint8_t *data, size_t size) : m_Data(data), m_Size(size) {}
 
         virtual size_t size() const override { return m_Size; };
         virtual const uint8_t *buffer() const override { return m_Data; };
@@ -215,7 +229,6 @@ class CRefInstructionSequence : public IByteSequence {
         virtual size_t size() const override { return m_Opcode.size() + sizeof(size_t); };
 
         virtual bool apply_anchor(SAnchor anchor) override {
-            if(m_IsAnchored) throw std::runtime_error("CRefInstructionSequence is already anchored");
             m_IsAnchored = true;
             m_InstrAnchor = anchor;
             return true;
@@ -245,6 +258,7 @@ class CRefInstructionSequence : public IByteSequence {
 #define SEQ_SEQ(...) CSequentialByteSequence({ __VA_ARGS__ })
 #define SEQ_IGN(len) CIgnoreSequence(len, val)
 #define SEQ_FILL(len, val) CFillSequence(len, val)
+#define SEQ_BUF(ptr, size) CBufferSequence(ptr, size)
 #define SEQ_HEX(str, ...) CHexSequence(str, { __VA_ARGS__ })
 #define SEQ_MASKED_HEX(str) CMaskedHexSequence(str)
 #define SEQ_STR(str) CStringSequence(str)

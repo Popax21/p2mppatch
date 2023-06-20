@@ -1,13 +1,85 @@
 #ifndef H_P2MPPATCH_DETOUR
 #define H_P2MPPATCH_DETOUR
 
+#include <tier0/dbg.h>
+#include <tier0/valve_minmax_off.h>
+
 #include "byteseq.hpp"
 #include "scratchpad.hpp"
 #include "patch.hpp"
 
 #define DETOUR_FUNC __attribute__((force_align_arg_pointer)) __attribute__((cdecl))
 
-class CDetour : public IByteSequence {
+class CScratchDetour : public IByteSequence {
+    public:
+        static const int MIN_SIZE = 5;
+
+        CScratchDetour(CScratchPad& scratch, int size, IByteSequence *scratch_seq) : CScratchDetour(scratch, size) {
+            m_ScratchSeq = std::unique_ptr<IByteSequence>(scratch_seq);
+            DevMsg("Prepared detour scratchpad entry %s (%d bytes)\n", update_scratch_seq(*scratch_seq).debug_str().c_str(), size);
+        }
+
+        virtual bool has_data() const override {
+            check_has_seq();
+            return m_DetourJumpSeq->has_data();
+        }
+
+        virtual size_t size() const override {
+            return m_DetourSize;
+        }
+
+        virtual const uint8_t *buffer() const override {
+            check_has_seq();
+            return m_DetourJumpSeq->buffer();
+        }
+
+        virtual bool apply_anchor(SAnchor anchor) override {
+            if(m_DetourJumpSeq && !m_DetourJumpSeq->apply_anchor(anchor)) return false;
+            m_DetourAnchor = anchor;
+            return true;
+        }
+
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override {
+            check_has_seq();
+            return m_DetourJumpSeq->compare(seq, this_off, seq_off, size);
+        }
+
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const override {
+            check_has_seq();
+            return m_DetourJumpSeq->compare(buf, off, size);
+        }
+
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override {
+            check_has_seq();
+            m_DetourJumpSeq->get_data(buf, off, size);
+        }
+    
+        virtual uint8_t operator [](size_t off) const override {
+            check_has_seq();
+            return (*m_DetourJumpSeq)[off];
+        }
+
+    protected:
+        CScratchDetour(CScratchPad& scratch, int size) : m_ScratchPad(scratch), m_DetourSize(size), m_ScratchSeq(nullptr), m_DetourJumpSeq(nullptr) {
+            if(size < MIN_SIZE) throw std::runtime_error("Invalid detour patchsite size");
+        }
+
+        inline SAnchor cur_anchor() const { return m_DetourAnchor; }
+        SAnchor update_scratch_seq(IByteSequence& seq);
+
+    private:
+        CScratchPad& m_ScratchPad;
+        int m_DetourSize;
+        CScratchPad::SSeqEntry m_ScratchPadEntry;
+        std::unique_ptr<IByteSequence> m_ScratchSeq, m_DetourJumpSeq;
+        SAnchor m_DetourAnchor;
+
+        inline void check_has_seq() const {
+            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CScratchDetour has not been given a scratch sequence yet");
+        }
+};
+
+class CFuncDetour : public CScratchDetour {
     public:
         struct SArgument {
             enum EType {
@@ -19,68 +91,63 @@ class CDetour : public IByteSequence {
 
             SArgument(EType type, int val) : type(type), val(val) {}
 
+            inline bool operator ==(SArgument other) const { return type == other.type && val == other.val; }
+            inline bool operator !=(SArgument other) const { return !(*this == other); }
+
             static const SArgument reg_eax, reg_ebx, reg_ecx, reg_edx, reg_esi, reg_edi, reg_eip;
 
             static inline SArgument local_var(int ebp_off) { return SArgument(EType::LOCAL_VAR, ebp_off); };
             static inline SArgument stack_var(int esp_off) { return SArgument(EType::STACK_VAR, esp_off); };
         };
 
-        static const int MIN_SIZE = 5;
+        CFuncDetour(CScratchPad& scratch, int size, void *func, std::initializer_list<SArgument> args) : CScratchDetour(scratch, size), m_DetourFunc(func), m_DetourArgs(args) {}
 
-        CDetour(CScratchPad& scratch, int size, void *func, std::initializer_list<SArgument> args, bool copy_orig = false) : m_ScratchPad(scratch), m_DetourSize(size), m_DetourFunc(func), m_DetourArgs(args), m_DetourCopyOrigAsm(copy_orig) {
-            if(size < MIN_SIZE) throw std::runtime_error("Invalid detour patchsite size");
+        CFuncDetour *prepend_orig_prefix() {
+            m_PrefixSeqs.push_back(std::unique_ptr<IByteSequence>(nullptr));
+            reapply_anchor();
+            return this;
         }
 
-        virtual size_t size() const override { return m_DetourSize; }
-        virtual const uint8_t *buffer() const override {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
-            return m_DetourJumpSeq->buffer();
+        CFuncDetour *prepend_seq_prefix(IByteSequence *seq) {
+            m_PrefixSeqs.emplace_back(seq);
+            reapply_anchor();
+            return this;
+        }
+
+        CFuncDetour *append_orig_suffix() {
+            m_SuffixSeqs.push_back(std::unique_ptr<IByteSequence>(nullptr));
+            reapply_anchor();
+            return this;
+        }
+
+        CFuncDetour *append_seq_suffix(IByteSequence *seq) {
+            m_SuffixSeqs.emplace_back(seq);
+            reapply_anchor();
+            return this;
         }
 
         virtual bool apply_anchor(SAnchor anchor) override;
 
-        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
-            return m_DetourJumpSeq->compare(seq, this_off, seq_off, size);
-        }
-
-        virtual int compare(const uint8_t *buf, size_t off, size_t size) const override {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
-            return m_DetourJumpSeq->compare(buf, off, size);
-        }
-
-        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
-            m_DetourJumpSeq->get_data(buf, off, size);
-        }
-
-        inline virtual uint8_t operator [](size_t off) const override {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CDetour has not been anchored yet");
-            return (*m_DetourJumpSeq)[off];
-        }
-
     private:
-        CScratchPad& m_ScratchPad;
-        int m_DetourSize;
+        inline void reapply_anchor() {
+            if(cur_anchor()) apply_anchor(cur_anchor());
+        }
+
         void *m_DetourFunc;
         const std::vector<SArgument> m_DetourArgs;
-        bool m_DetourCopyOrigAsm;
-
-        CScratchPad::SSeqEntry m_ScratchPadEntry;
-        std::unique_ptr<IByteSequence> m_DetourJumpSeq;
+        std::vector<std::unique_ptr<IByteSequence>> m_PrefixSeqs, m_SuffixSeqs;
 };
 
-#define DETOUR_ARG_EAX CDetour::SArgument::reg_eax
-#define DETOUR_ARG_EBX CDetour::SArgument::reg_ebx
-#define DETOUR_ARG_ECX CDetour::SArgument::reg_ecx
-#define DETOUR_ARG_EDX CDetour::SArgument::reg_edx
-#define DETOUR_ARG_ESI CDetour::SArgument::reg_esi
-#define DETOUR_ARG_EDI CDetour::SArgument::reg_edi
-#define DETOUR_ARG_EIP CDetour::SArgument::reg_eip
-#define DETOUR_ARG_LOCAL(ebp_off) CDetour::SArgument::local_var(ebp_off)
-#define DETOUR_ARG_STACK(esp_off) CDetour::SArgument::stack_var(esp_off)
+#define DETOUR_ARG_EAX CFuncDetour::SArgument::reg_eax
+#define DETOUR_ARG_EBX CFuncDetour::SArgument::reg_ebx
+#define DETOUR_ARG_ECX CFuncDetour::SArgument::reg_ecx
+#define DETOUR_ARG_EDX CFuncDetour::SArgument::reg_edx
+#define DETOUR_ARG_ESI CFuncDetour::SArgument::reg_esi
+#define DETOUR_ARG_EDI CFuncDetour::SArgument::reg_edi
+#define DETOUR_ARG_EIP CFuncDetour::SArgument::reg_eip
+#define DETOUR_ARG_LOCAL(ebp_off) CFuncDetour::SArgument::local_var(ebp_off)
+#define DETOUR_ARG_STACK(esp_off) CFuncDetour::SArgument::stack_var(esp_off)
 
-#define SEQ_DETOUR(plugin, size, func, ...) CDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ })
-#define SEQ_DETOUR_COPY_ORIG(plugin, size, func, ...) CDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ }, true)
+#define SEQ_FUNC_DETOUR(plugin, size, func, ...) CFuncDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ })
 
 #endif

@@ -8,7 +8,7 @@
 #include <sys/mman.h>
 
 static inline void *alloc_page() {
-    void *page = mmap(NULL, CScratchPad::SCRATCH_PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void *page = mmap(nullptr, CScratchPad::SCRATCH_PAGE_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if(page == MAP_FAILED) throw std::system_error(errno, std::system_category());
     return page;
 }

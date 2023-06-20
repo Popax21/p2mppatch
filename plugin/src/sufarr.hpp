@@ -6,7 +6,8 @@
 class CSuffixArray {
     public:
         CSuffixArray(const IByteSequence& seq, size_t max_needle_size);
-        CSuffixArray(CSuffixArray& arr);
+        CSuffixArray(CSuffixArray&& arr);
+        CSuffixArray(const CSuffixArray& arr) = delete;
         ~CSuffixArray();
 
         inline const IByteSequence& get_sequence() const { return m_Sequence; }

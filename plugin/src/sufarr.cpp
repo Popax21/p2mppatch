@@ -9,7 +9,7 @@ CSuffixArray::CSuffixArray(const IByteSequence& seq, size_t max_needle_size) : m
     build(max_needle_size);
 }
 
-CSuffixArray::CSuffixArray(CSuffixArray& arr) : m_Sequence(arr.m_Sequence), m_SufOffsets(arr.m_SufOffsets) {
+CSuffixArray::CSuffixArray(CSuffixArray&& arr) : m_Sequence(arr.m_Sequence), m_SufOffsets(arr.m_SufOffsets) {
     arr.m_SufOffsets = nullptr;
 }
 

@@ -66,9 +66,9 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
 static bool find_module(const char *name, void **base_addr, size_t *size, uint8_t **page_flags) {
     struct check_mod_params params;
     params.name = name;
-    params.base_addr = NULL;
+    params.base_addr = nullptr;
     params.size = 0;
-    params.page_flags = NULL;
+    params.page_flags = nullptr;
 
     dl_iterate_phdr(check_mod, &params);
     if(!params.base_addr) return false;

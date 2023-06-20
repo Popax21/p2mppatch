@@ -37,7 +37,7 @@ void CMPPatchPlugin::update_patches() {
 
     //Apply patches
     Msg("Applying patches...\n");
-    for(std::unique_ptr<CPatch>& patch : m_Patches) patch->apply();
+    for(std::unique_ptr<IPatch>& patch : m_Patches) patch->apply();
 
     //Invoke post-apply hooks
     Msg("Invoking post-apply hooks...\n");
@@ -63,7 +63,7 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
     ConnectTier2Libraries(&interfaceFactory, 1);
 
     //Get interfaces
-    if(!(m_PlayerInfoManager = (IPlayerInfoManager*) gameServerFactory(INTERFACEVERSION_PLAYERINFOMANAGER, NULL))) {
+    if(!(m_PlayerInfoManager = (IPlayerInfoManager*) gameServerFactory(INTERFACEVERSION_PLAYERINFOMANAGER, nullptr))) {
         Warning("Couldn't obtain IPlayerInfoManager [%s] interface!", INTERFACEVERSION_PLAYERINFOMANAGER);
         return false;
     } else DevMsg("IPlayerInfoManager: %p\n", m_PlayerInfoManager);
@@ -130,7 +130,7 @@ void CMPPatchPlugin::Unload() {
 
 void CMPPatchPlugin::clear_patches() {
     //Revert patches
-    for(std::unique_ptr<CPatch>& patch : m_Patches) patch->revert();
+    for(std::unique_ptr<IPatch>& patch : m_Patches) patch->revert();
     m_Patches.clear();
 
     //Invoke post-revert hooks

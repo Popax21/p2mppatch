@@ -14,11 +14,11 @@ namespace patches {
             virtual void register_patches(CMPPatchPlugin& plugin) override {
                 //Find CPortalMPGameRules::ClientDisconnected and remove the disconnect check
                 SAnchor CPortalMPGameRules_ClientDisconnected = anchors::server::CPortalMPGameRules::ClientDisconnected.get(plugin.server_module());
-                plugin.register_patch<CPatch>(CPortalMPGameRules_ClientDisconnected + 0x8d, new SEQ_HEX("74"), new SEQ_HEX("eb"));
+                plugin.register_patch<CSeqPatch>(CPortalMPGameRules_ClientDisconnected + 0x8d, new SEQ_HEX("74"), new SEQ_HEX("eb"));
 
                 //Find CPortal_Player::PlayerTransitionCompleteThink and remove the disconnect check
                 SAnchor CPortal_Player_PlayerTransitionCompleteThink = anchors::server::CPortal_Player::PlayerTransitionCompleteThink.get(plugin.server_module());
-                plugin.register_patch<CPatch>(CPortal_Player_PlayerTransitionCompleteThink + 0x41, new SEQ_HEX("74 54"), new SEQ_HEX("eb 54"));
+                plugin.register_patch<CSeqPatch>(CPortal_Player_PlayerTransitionCompleteThink + 0x41, new SEQ_HEX("74 54"), new SEQ_HEX("eb 54"));
             }
     };
 };

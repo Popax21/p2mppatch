@@ -66,11 +66,10 @@ namespace patches::anchors {
                 //Obtain and check the global pointer from the instruction
                 uint8_t *glob_ptr = (uint8_t*) SRefInstrAnchor<void*>::determine_value(module);
                 if(glob_ptr < (uint8_t*) module.base_addr() || (uint8_t*) module.base_addr() + module.size() <= glob_ptr) {
-                    std::string debug_str = ref_instr_anchor(module).debug_str();
-                    DevMsg("Obtained out-of-bounds global variable '%s' from anchor instruction %s: %p (module '%s': %p - %p)\n", m_Name, debug_str.c_str(), glob_ptr, module.name(), module.base_addr(), (uint8_t*) module.base_addr() + module.size());
+                    DevMsg("Obtained out-of-bounds global variable '%s' from anchor instruction %s: %p (module '%s': %p - %p)\n", m_Name, ref_instr_anchor(module).debug_str().c_str(), glob_ptr, module.name(), module.base_addr(), (uint8_t*) module.base_addr() + module.size());
 
                     std::stringstream sstream;
-                    sstream << "Global variable anchor instruction " << ref_instr_anchor(module).debug_str() << " references OOB module address " << glob_ptr;
+                    sstream << "Global variable anchor instruction " << ref_instr_anchor(module) << " references OOB module address " << glob_ptr;
                     throw std::runtime_error(sstream.str());
                 }
 

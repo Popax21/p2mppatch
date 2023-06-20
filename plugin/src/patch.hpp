@@ -6,12 +6,20 @@
 
 class CMPPatchPlugin;
 
-class CPatch {
+class IPatch {
     public:
-        CPatch(SAnchor target, IByteSequence *orig_seq, IByteSequence *new_seq);
-        CPatch(CPatch& patch);
-        CPatch(const CPatch& patch) = delete;
-        virtual ~CPatch();
+        virtual ~IPatch() {}
+
+        virtual void apply() = 0;
+        virtual void revert() = 0;
+};
+
+class CSeqPatch : public IPatch {
+    public:
+        CSeqPatch(SAnchor target, IByteSequence *orig_seq, IByteSequence *new_seq);
+        CSeqPatch(CSeqPatch&& patch);
+        CSeqPatch(const CSeqPatch& patch) = delete;
+        virtual ~CSeqPatch();
 
         virtual void apply();
         virtual void revert();

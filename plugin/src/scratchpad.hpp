@@ -12,7 +12,7 @@ class CScratchPad {
         struct SSeqEntry {
             public:
                 SSeqEntry() : m_ScratchPad(nullptr) {}
-                SSeqEntry(SSeqEntry& o) : m_ScratchPad(o.m_ScratchPad), m_PageIdx(o.m_PageIdx), m_Anchor(o.m_Anchor), m_SeqSize(o.m_SeqSize) { o.m_ScratchPad = nullptr; }
+                SSeqEntry(SSeqEntry&& o) : m_ScratchPad(o.m_ScratchPad), m_PageIdx(o.m_PageIdx), m_Anchor(o.m_Anchor), m_SeqSize(o.m_SeqSize) { o.m_ScratchPad = nullptr; }
                 SSeqEntry(const SSeqEntry& o) = delete;
                 ~SSeqEntry() { if(m_ScratchPad) m_ScratchPad->free_entry(*this); }
 
@@ -41,7 +41,7 @@ class CScratchPad {
         };
 
         CScratchPad();
-        CScratchPad(CScratchPad& o) = delete;
+        CScratchPad(CScratchPad&& o) = delete;
         CScratchPad(const CScratchPad& o) = delete;
         ~CScratchPad() { clear(); }
 
