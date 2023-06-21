@@ -4,6 +4,7 @@
 #include <set>
 #include "patch.hpp"
 #include "detour.hpp"
+#include "hook.hpp"
 
 class IServer;
 class CMPPatchPlugin;
@@ -45,8 +46,8 @@ namespace patches {
             static uint16_t& get_rules_ready_tracker_slot(void *rules) { return *(uint16_t*) ((uint8_t*) rules + OFF_CPortalMPGameRules_m_bDataReceived); }
             static SReadyTracker *get_rules_ready_tracker(void *rules) { return tracker_slots[get_rules_ready_tracker_slot(rules)]; }
 
-            DETOUR_FUNC static void detour_CPortalMPGameRules_CPortalMPGameRules(void **ptr_rules);
-            DETOUR_FUNC static void detour_CPortalMPGameRules_destr_CPortalMPGameRules(void **ptr_rules);
+            HOOK_FUNC static void hook_CPortalMPGameRules_CPortalMPGameRules(HOOK_ORIG void (*orig)(void*), void *rules);
+            HOOK_FUNC static void hook_CPortalMPGameRules_destr_CPortalMPGameRules(HOOK_ORIG void (*orig)(void*), void *rules);
             DETOUR_FUNC static void detour_CPortalMPGameRules_ClientCommandKeyValues_A(void **ptr_rules, void **ptr_pPlayer);
             DETOUR_FUNC static void detour_CPortalMPGameRules_ClientCommandKeyValues_B(void **ptr_rules, int *ptr_everyoneReady);
             DETOUR_FUNC static void detour_CPortalMPGameRules_ClientDisconnected(void **ptr_rules, void **ptr_pPlayer);

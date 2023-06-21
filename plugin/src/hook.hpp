@@ -59,7 +59,7 @@ class CHookTrackerFact : IModuleFact<std::unique_ptr<CHookTracker>> {
 
 class CFuncHook : public IPatch {
     public:
-        CFuncHook(CScratchPad& scratch, CHookTracker& tracker, void *hook_func, int order);
+        CFuncHook(CScratchPad& scratch, CHookTracker& tracker, void *hook_func, int order = 0);
         ~CFuncHook() { revert(); }
 
         inline CHookTracker& hook_tracker() const { return m_HookTracker; }

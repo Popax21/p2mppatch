@@ -35,7 +35,7 @@ void CSeqPatch::apply() {
 
     //Check if the original sequence matches the target
     if(m_OrigSeq->compare((uint8_t*) m_PatchTarget.get_addr(), 0, m_PatchSize) != 0) {
-        DevWarning("Mismatching patch target / original sequence: ");
+        DevWarning("Mismatching patch target %s original sequence: ", m_PatchTarget.debug_str().c_str());
         for(size_t i = 0; i < m_PatchSize; i++) DevWarning("%02x", ((uint8_t*) m_PatchTarget.get_addr())[i]);
         DevWarning(" != ");
         for(size_t i = 0; i < m_PatchSize; i++) DevWarning("%02x", (*m_OrigSeq)[i]);

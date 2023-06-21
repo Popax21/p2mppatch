@@ -17,7 +17,7 @@ namespace patches::anchors {
         public:
             SFuncAnchor(const char *name, const char *hex_seq, int off = 0) : m_Name(name), m_Sequence(hex_seq), m_Offset(off) {}
             SFuncAnchor(const char *name, const char *hex_seq, const char *begin_hex_seq, int off = 0) : SFuncAnchor(name, hex_seq, off) {
-                m_FuncBeginSequence = std::make_unique<CHexSequence>(begin_hex_seq);
+                m_FuncBeginSequence = std::make_unique<CMaskedHexSequence>(begin_hex_seq);
                 m_HookTrackerFact = std::make_unique<CHookTrackerFact>(*this, *m_FuncBeginSequence);
             }
 
@@ -38,7 +38,7 @@ namespace patches::anchors {
             CHexSequence m_Sequence;
             int m_Offset;
 
-            std::unique_ptr<CHexSequence> m_FuncBeginSequence;
+            std::unique_ptr<CMaskedHexSequence> m_FuncBeginSequence;
             std::unique_ptr<CHookTrackerFact> m_HookTrackerFact;
 
             virtual SAnchor determine_value(CModule& module) override {

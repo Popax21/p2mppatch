@@ -45,8 +45,8 @@ namespace patches::anchors {
         namespace CPortalMPGameRules {
             SMemberOffAnchor m_bDataReceived("CPortalMPGameRules::m_bDataReceived", CPortalMPGameRules, 0x316, "66 89 8f ?? ?? ?? ??", 3);
 
-            SFuncAnchor CPortalMPGameRules("CPortalMPGameRules::CPortalMPGameRules", "83 c4 10 c7 87 30 02 00 00 00 00 00 00", 0x1a);
-            SFuncAnchor destr_CPortalMPGameRules("CPortalMPGameRules::~CPortalMPGameRules", "89 d8 c1 e0 04 03 86 9c 1a 00 00 8b 50 08 c7 40 0c 00 00 00 00 85 d2", 0x70);
+            SFuncAnchor CPortalMPGameRules("CPortalMPGameRules::CPortalMPGameRules", "83 c4 10 c7 87 30 02 00 00 00 00 00 00", "55 89 e5 57 56 53", 0x1a);
+            SFuncAnchor destr_CPortalMPGameRules("CPortalMPGameRules::~CPortalMPGameRules", "89 d8 c1 e0 04 03 86 9c 1a 00 00 8b 50 08 c7 40 0c 00 00 00 00 85 d2", "56 53 83 ec 04", 0x70);
 
             SFuncAnchor ClientCommandKeyValues("CPortalMPGameRules::ClientCommandKeyValues", "55 57 56 53 83 ec 3c 8b 44 24 50 8b 5c 24 58 89 44 24 04 8b 44 24 54 85 db");
             SFuncAnchor ClientDisconnected("CPortalMPGameRules::ClientDisconnected", "55 57 56 53 83 ec 28 8b 44 24 3c 8b 7c 24 40 89 44 24 18 57");
@@ -71,7 +71,7 @@ namespace patches::anchors {
 
         namespace CPortal_Player {
             SFuncAnchor Spawn("CPortal_Player::Spawn", "8b 03 89 1c 24 ff 90 3c 08 00 00 83 c4 10 80 bb 10 0b 00 00 00", 0x62);
-            SFuncAnchor ShouldCollide("CPortal_Player::ShouldCollide", "53 8b 4c 24 08 8b 44 24 0c 8b 5c 24 10 8b 52 30", 0x6);
+            SFuncAnchor ShouldCollide("CPortal_Player::ShouldCollide", "53 8b 4c 24 08 8b 44 24 0c 8b 5c 24 10 8b 52 30", "8b 15 ?? ?? ?? ??", 0x6);
 
             SFuncAnchor ClientCommand("CPortal_Player::ClientCommand", "55 89 e5 57 56 53 81 ec 9c 00 00 00 8b 7d 0c 8b 5d 08 8b 07 85 c0");
 

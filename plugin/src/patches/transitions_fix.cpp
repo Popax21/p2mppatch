@@ -33,15 +33,6 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     //Rewire the functionality of m_bDataReceived
     //This bool[2] array is used to track whether all players are ready during a transition
     //Replace it with an arbitrary-size ready tracker, reusing the 2 bytes as the uint16_t slot index
-    SAnchor CPortalMPGameRules_destr_CPortalMPGameRules = anchors::server::CPortalMPGameRules::destr_CPortalMPGameRules.get(plugin.server_module());
-    SAnchor CPortalMPGameRules_ClientCommandKeyValues = anchors::server::CPortalMPGameRules::ClientCommandKeyValues.get(plugin.server_module());
-    SAnchor CPortalMPGameRules_ClientDisconnected = anchors::server::CPortalMPGameRules::ClientDisconnected.get(plugin.server_module());
-    SAnchor CPortalMPGameRules_SetMapCompleteData = anchors::server::CPortalMPGameRules::SetMapCompleteData.get(plugin.server_module());
-
-    SAnchor CPortal_Player_Spawn = anchors::server::CPortal_Player::Spawn.get(plugin.server_module());
-    SAnchor CPortal_Player_ClientCommand = anchors::server::CPortal_Player::ClientCommand.get(plugin.server_module());
-    SAnchor CPortal_Player_OnFullyConnected = anchors::server::CPortal_Player::OnFullyConnected.get(plugin.server_module());
-    //CPortal_Player::PlayerTransitionCompleteThink has already been patched, so it is no longer accessing m_bDataReceived
 
     // - find functions/globals we need to link to
     glob_sv = (IServer*) anchors::engine::sv.get(plugin.engine_module()).get_addr();
@@ -52,17 +43,16 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     CPortalMPGameRules_SendAllMapCompleteData = (void (*)(void*)) anchors::server::CPortalMPGameRules::SendAllMapCompleteData.get(plugin.server_module()).get_addr();
     CPortalMPGameRules_StartPlayerTransitionThinks = (void (*)(void*)) anchors::server::CPortalMPGameRules::StartPlayerTransitionThinks.get(plugin.server_module()).get_addr();
 
-    // - CPortalMPGameRules::CPortalMPGameRules: detour to allocate the ready tracker
-    plugin.register_patch<CSeqPatch>(CPortalMPGameRules_CPortalMPGameRules + 0x316, new SEQ_MASKED_HEX("66 89 8f ?? ?? ?? ??"),
-        new SEQ_FUNC_DETOUR(plugin, 7, detour_CPortalMPGameRules_CPortalMPGameRules, DETOUR_ARG_EDI)
-    );
+    // - CPortalMPGameRules::CPortalMPGameRules: hook to allocate the ready tracker
+    CHookTracker& htrack_CPortalMPGameRules_CPortalMPGameRules = anchors::server::CPortalMPGameRules::CPortalMPGameRules.hook_tracker(plugin.server_module()); 
+    plugin.register_patch<CFuncHook>(plugin.scratchpad(), htrack_CPortalMPGameRules_CPortalMPGameRules, (void*) &hook_CPortalMPGameRules_CPortalMPGameRules);
 
-    // - CPortalMPGameRules::~CPortalMPGameRules: detour to delete the ready tracker
-    plugin.register_patch<CSeqPatch>(CPortalMPGameRules_destr_CPortalMPGameRules + 0x5f, new SEQ_HEX("8b 9e a8 1a 00 00"),
-        (new SEQ_FUNC_DETOUR(plugin, 6, detour_CPortalMPGameRules_destr_CPortalMPGameRules, DETOUR_ARG_ESI))->prepend_orig_prefix()
-    );
+    // - CPortalMPGameRules::~CPortalMPGameRules: hook to delete the ready tracker
+    CHookTracker& htrack_CPortalMPGameRules_destr_CPortalMPGameRules = anchors::server::CPortalMPGameRules::destr_CPortalMPGameRules.hook_tracker(plugin.server_module()); 
+    plugin.register_patch<CFuncHook>(plugin.scratchpad(), htrack_CPortalMPGameRules_destr_CPortalMPGameRules, (void*) &hook_CPortalMPGameRules_destr_CPortalMPGameRules);
 
     // - CPortalMPGameRules::ClientCommandKeyValues: detour `m_bDataReceived[nPlayer] = true;` and `if(m_bDataReceived[0] && m_bDataReceived[1]) ...`
+    SAnchor CPortalMPGameRules_ClientCommandKeyValues = anchors::server::CPortalMPGameRules::ClientCommandKeyValues.get(plugin.server_module());
     plugin.register_patch<CSeqPatch>(CPortalMPGameRules_ClientCommandKeyValues + 0xf8, new SEQ_HEX("c6 84 30 7d 1c 00 00 01"), 
         new SEQ_FUNC_DETOUR(plugin, 8, detour_CPortalMPGameRules_ClientCommandKeyValues_A, DETOUR_ARG_EAX, DETOUR_ARG_EDI)
     );
@@ -73,13 +63,15 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
 
     // - CPortalMPGameRules::ClientDisconnected: detour to remove the player from the ready tracker
     //Replace the bIsSSCredits check to make room for the detour (it's no longer used because of the disconnect check patch anyway)
+    SAnchor CPortalMPGameRules_ClientDisconnected = anchors::server::CPortalMPGameRules::ClientDisconnected.get(plugin.server_module());
     plugin.register_patch<CSeqPatch>(CPortalMPGameRules_ClientDisconnected + 0x69, new SEQ_MASKED_HEX("8b 0d ?? ?? ?? ?? 85 c9 74 0d e8 ?? ?? ?? ?? 84 c0 0f 85 b0 00 00 00"), new SEQ_SEQ(
         new SEQ_HEX("8b 4c 24 0c"), //mov ecx, [<this arg>]
         new SEQ_FUNC_DETOUR(plugin, 19, detour_CPortalMPGameRules_ClientDisconnected, DETOUR_ARG_ECX, DETOUR_ARG_ESI)
     ));
 
     // - CPortalMPGameRules::SetMapCompleteData: detour `if(m_bDataReceived[nPlayer]) return;` and stub out the player find routine 
-    //The nPlayer argument (originally determined by the player team) has been patched to be the raw player pointer itself 
+    //The nPlayer argument (originally determined by the player team) has been patched to be the raw player pointer itself
+    SAnchor CPortalMPGameRules_SetMapCompleteData = anchors::server::CPortalMPGameRules::SetMapCompleteData.get(plugin.server_module());
     plugin.register_patch<CSeqPatch>(CPortalMPGameRules_SetMapCompleteData + 0xf, new SEQ_HEX("83 f8 01 77 6e 8b 4d 08 80 bc 01 7d 1c 00 00 00"), new SEQ_SEQ(
         new SEQ_FUNC_DETOUR(plugin, 14, detour_CPortalMPGameRules_SetMapCompleteData, DETOUR_ARG_LOCAL(8), DETOUR_ARG_EAX, DETOUR_ARG_EBX),
         new SEQ_HEX("85 db") //test ebx, ebx
@@ -90,19 +82,24 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
     ));
 
     // - CPortal_Player::Spawn: detour `if(!m_bDataReceived[0] || !m_bDataReceived[1]) ...`
+    SAnchor CPortal_Player_Spawn = anchors::server::CPortal_Player::Spawn.get(plugin.server_module());
     plugin.register_patch<CSeqPatch>(CPortal_Player_Spawn + 0xc95, new SEQ_HEX("80 b8 7d 1c 00 00 00 74 0d 80 b8 7e 1c 00 00 00"), new SEQ_SEQ(
         new SEQ_FUNC_DETOUR(plugin, 14, detour_CPortal_Player_Spawn, DETOUR_ARG_EAX, DETOUR_ARG_EDX),
         new SEQ_HEX("85 d2") //test edx, edx
     ));
 
     // - CPortal_Player::ClientCommand: replace the SetMapCompleteData nPlayer argument with the player pointer
+    SAnchor CPortal_Player_ClientCommand = anchors::server::CPortal_Player::ClientCommand.get(plugin.server_module());
     plugin.register_patch<CSeqPatch>(CPortal_Player_ClientCommand + 0xbed, new SEQ_MASKED_HEX("e8 ?? ?? ?? ??"), new SEQ_HEX("8b 45 08 90 90"));
 
     // - CPortal_Player::OnFullyConnected: detour `if(!m_bDataReceived[0] || !m_bDataReceived[1]) ...`
+    SAnchor CPortal_Player_OnFullyConnected = anchors::server::CPortal_Player::OnFullyConnected.get(plugin.server_module());
     plugin.register_patch<CSeqPatch>(CPortal_Player_OnFullyConnected + 0x9d, new SEQ_HEX("80 b8 7d 1c 00 00 00 0f 84 36 01 00 00 80 b8 7e 1c 00 00 00"), new SEQ_SEQ(
         new SEQ_FUNC_DETOUR(plugin, 18, detour_CPortal_Player_OnFullyConnected, DETOUR_ARG_EAX, DETOUR_ARG_EDI),
         new SEQ_HEX("85 ff") //test edi, edi
     ));
+
+    // - CPortal_Player::PlayerTransitionCompleteThink has already been patched, so it is no longer accessing m_bDataReceived
 }
 
 void CTransitionsFixPatch::SReadyTracker::init_match_req_player_count() {
@@ -144,9 +141,10 @@ bool CTransitionsFixPatch::SReadyTracker::is_everyone_ready() const {
     return ready_players.size() >= get_req_players();
 }
 
-DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_CPortalMPGameRules(void **ptr_rules) {
-    void *rules = *ptr_rules;
-    DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::CPortalMPGameRules | this=%p\n", rules);
+HOOK_FUNC void CTransitionsFixPatch::hook_CPortalMPGameRules_CPortalMPGameRules(HOOK_ORIG void (*orig)(void*), void *rules) {
+    DevMsg("HOOK CTransitionsFixPatch | CPortalMPGameRules::CPortalMPGameRules | this=%p\n", rules);
+
+    orig(rules);
 
     //Find a free tracker slot for the rules to reference
     int slot = -1;
@@ -173,14 +171,15 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_CPortalMPGameRu
     }
 }
 
-DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_destr_CPortalMPGameRules(void **ptr_rules) {
-    void *rules = *ptr_rules;
-    DevMsg("DETOUR CTransitionsFixPatch | CPortalMPGameRules::~CPortalMPGameRules | this=%p\n", rules);
+HOOK_FUNC void CTransitionsFixPatch::hook_CPortalMPGameRules_destr_CPortalMPGameRules(HOOK_ORIG void (*orig)(void*), void *rules) {
+    DevMsg("HOOK CTransitionsFixPatch | CPortalMPGameRules::~CPortalMPGameRules | this=%p\n", rules);
 
     //Free the ready tracker
     Msg("P2MPPatch | Freeing SReadyTracker %p [slot %d] for CPortalMPGameRules %p\n", get_rules_ready_tracker(rules), (int) get_rules_ready_tracker_slot(rules), rules);
     delete get_rules_ready_tracker(rules);
     tracker_slots[get_rules_ready_tracker_slot(rules)] = nullptr;
+
+    orig(rules);
 }
 
 DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientCommandKeyValues_A(void **ptr_rules, void **ptr_pPlayer) {

@@ -101,6 +101,7 @@ template<typename T> class IModuleFact : IModuleDependent {
         }
 
     protected:
+        IModuleFact() : m_Module(nullptr) {}
         ~IModuleFact() {}
 
         virtual T determine_value(CModule& module) = 0;

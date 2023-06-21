@@ -11,7 +11,7 @@
 
 using namespace patches;
 
-int CPlayerStuckPatch::OFF_ConVar_boolValue, CPlayerStuckPatch::OFF_CBaseEntity_m_MoveType, CPlayerStuckPatch::OFF_CBasePlayer_m_StuckLast;
+int CPlayerStuckPatch::OFF_CBaseEntity_m_MoveType, CPlayerStuckPatch::OFF_CBasePlayer_m_StuckLast;
 
 CGlobalVars *CPlayerStuckPatch::gpGlobals;
 void **CPlayerStuckPatch::ptr_g_pGameRules;
@@ -30,12 +30,8 @@ void CPlayerStuckPatch::register_patches(CMPPatchPlugin& plugin) {
     plugin.register_patch<CFuncHook>(plugin.scratchpad(), htrack_CGameMovement_CheckStuck, (void*) &hook_CGameMovement_CheckStuck, -100000);
 
     //Detour the portal_use_player_avoidance cvar check in CPortal_Player::ShouldCollide
-    SAnchor CPortal_Player_ShouldCollide = anchors::server::CPortal_Player::ShouldCollide.get(plugin.server_module());
-    plugin.register_patch<CSeqPatch>(CPortal_Player_ShouldCollide + 0xb, new SEQ_MASKED_HEX("8b 44 24 0c 8b 5c 24 10 8b 52 ??"), new SEQ_SEQ(
-        (new SEQ_FUNC_DETOUR(plugin, 8, detour_CPortal_Player_ShouldCollide, DETOUR_ARG_ECX, DETOUR_ARG_EDX, DETOUR_ARG_EAX, DETOUR_ARG_EDX))->prepend_orig_prefix(),
-        new SEQ_FILL(3, 0x90)
-    ));
-    OFF_ConVar_boolValue = *((uint8_t*) CPortal_Player_ShouldCollide.get_addr() + 0xb + 10);
+    CHookTracker& htrack_CPortal_Player_ShouldCollide = anchors::server::CPortal_Player::ShouldCollide.hook_tracker(plugin.server_module());
+    plugin.register_patch<CFuncHook>(plugin.scratchpad(), htrack_CPortal_Player_ShouldCollide, (void*) &hook_CPortal_Player_ShouldCollide);
 }
 
 enum {
@@ -48,7 +44,6 @@ enum {
 HOOK_FUNC int CPlayerStuckPatch::hook_CGameMovement_CheckStuck(HOOK_ORIG int (*orig)(void*), void **movement) {
     void *player = movement[1];
     int& m_StuckLast = *(int*) ((uint8_t*) player + OFF_CBasePlayer_m_StuckLast);
-    // DevMsg("DETOUR CPlayerStuckPatch | CGameMovement::CheckStuck | this=%p player=%p m_StuckLast=%d\n", movement, player, m_StuckLast);
 
     //Check if we should intervene
     if(glob_sv->GetNumClients() - glob_sv->GetNumProxies() <= (should_apply_sp_compat_patches(*ptr_g_pGameRules, gpGlobals) ? 1 : 2)) {
@@ -82,45 +77,34 @@ HOOK_FUNC int CPlayerStuckPatch::hook_CGameMovement_CheckStuck(HOOK_ORIG int (*o
     return 0;
 }
 
-DETOUR_FUNC void CPlayerStuckPatch::detour_CPortal_Player_ShouldCollide(void **ptr_player, void **ptr_playerAvoidanceCvar, int *ptr_collisionGroup, int *ptr_shouldIgnorePlayerCol) {
-    void *player = *ptr_player;
-    void *playerAvoidanceCvar = *ptr_playerAvoidanceCvar;
-    int collisionGroup = *ptr_collisionGroup;
+HOOK_FUNC bool CPlayerStuckPatch::hook_CPortal_Player_ShouldCollide(HOOK_ORIG bool (*orig)(void*, int, int), void *player, int collisionGroup, int contentsMask) {
     int& m_StuckLast = *(int*) ((uint8_t*) player + OFF_CBasePlayer_m_StuckLast);
-    // DevMsg("DETOUR CPlayerStuckPatch | CPortal_Player::ShouldCollide | this=%p playerAvoidanceCvar=%p collisionGroup=%d m_StuckLast=%d\n", player, playerAvoidanceCvar, collisionGroup, m_StuckLast);
 
-    //Get the value of the cvar
-    if(*(uint32_t*) ((uint8_t*) playerAvoidanceCvar + OFF_ConVar_boolValue) != 0) {
-        *ptr_shouldIgnorePlayerCol = 1;
-        return;
+    //Check if we're colliding with another player
+    if(collisionGroup != COLLISION_GROUP_PLAYER && collisionGroup != COLLISION_GROUP_PLAYER_MOVEMENT) {
+        return orig(player, collisionGroup, contentsMask);
     }
 
     //Check if we should intervene
     if(glob_sv->GetNumClients() - glob_sv->GetNumProxies() <= (should_apply_sp_compat_patches(*ptr_g_pGameRules, gpGlobals) ? 1 : 2)) {
-        *ptr_shouldIgnorePlayerCol = 0;
-        return;
+        return orig(player, collisionGroup, contentsMask);
     }
 
-    //Check if we're colliding with another player
-    if(collisionGroup == COLLISION_GROUP_PLAYER || collisionGroup == COLLISION_GROUP_PLAYER_MOVEMENT) {
-        //Check if the player is stuck
-        if(m_StuckLast != 0) {
-            if(m_StuckLast >= 0) {
-                m_StuckLast = STUCK_HAD_PLAYER_COL_FIRST; //We go into a separate state for the first few frames upon being stuck in another player so that they are also picked up as being stuck in us
-            } else if(STUCK_WAIT_PLAYER_COL_FIRST <= m_StuckLast && m_StuckLast <= STUCK_WAIT_PLAYER_COL_LAST) {
-                m_StuckLast = STUCK_HAD_PLAYER_COL_FIRST + (m_StuckLast - STUCK_WAIT_PLAYER_COL_FIRST); //This will make the CheckStuck detour preserve our stuck status for the next check
-            }
-
-            *ptr_shouldIgnorePlayerCol = (m_StuckLast >= (STUCK_HAD_PLAYER_COL_FIRST + STUCK_HAD_PLAYER_COL_LAST) / 2) ? 1 : 0;
-            return;
-        }
-
-        //Check if the player is in noclip
-        if(*((uint8_t*) player + OFF_CBaseEntity_m_MoveType) == MOVETYPE_NOCLIP) {
-            *ptr_shouldIgnorePlayerCol = 1;
-            return;
-        }
+    //Check if the player is in noclip
+    if(*((uint8_t*) player + OFF_CBaseEntity_m_MoveType) == MOVETYPE_NOCLIP) {
+        return false;
     }
 
-    *ptr_shouldIgnorePlayerCol = 0;
+    //Check if the player is stuck
+    if(m_StuckLast != 0) {
+        if(m_StuckLast >= 0) {
+            m_StuckLast = STUCK_HAD_PLAYER_COL_FIRST; //We go into a separate state for the first few frames upon being stuck in another player so that they are also picked up as being stuck in us
+        } else if(STUCK_WAIT_PLAYER_COL_FIRST <= m_StuckLast && m_StuckLast <= STUCK_WAIT_PLAYER_COL_LAST) {
+            m_StuckLast = STUCK_HAD_PLAYER_COL_FIRST + (m_StuckLast - STUCK_WAIT_PLAYER_COL_FIRST); //This will make the CheckStuck detour preserve our stuck status for the next check
+        }
+
+        if(m_StuckLast >= (STUCK_HAD_PLAYER_COL_FIRST + STUCK_HAD_PLAYER_COL_LAST) / 2) return false;
+    }
+
+    return orig(player, collisionGroup, contentsMask);
 }
