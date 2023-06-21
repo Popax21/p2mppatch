@@ -18,6 +18,7 @@ void **CPlayerStuckPatch::ptr_g_pGameRules;
 IServer *CPlayerStuckPatch::glob_sv;
 
 void CPlayerStuckPatch::register_patches(CMPPatchPlugin& plugin) {
+    //Obtain needed misc information for the hooks
     OFF_CBaseEntity_m_MoveType = anchors::server::CBaseEntity::m_MoveType.get(plugin.server_module());
     OFF_CBasePlayer_m_StuckLast = anchors::server::CGameMovement::m_LastStuck.get(plugin.server_module());
 
@@ -25,11 +26,10 @@ void CPlayerStuckPatch::register_patches(CMPPatchPlugin& plugin) {
     ptr_g_pGameRules = (void**) anchors::server::g_pGameRules.get(plugin.server_module()).get_addr();
     glob_sv = (IServer*) anchors::engine::sv.get(plugin.engine_module()).get_addr();
 
-    //Hook into CGameMovement::CheckStuck
+    //Hook into CGameMovement::CheckStuck and CPortal_Player::ShouldCollide
     CHookTracker& htrack_CGameMovement_CheckStuck = anchors::server::CGameMovement::CheckStuck.hook_tracker(plugin.server_module());
     plugin.register_patch<CFuncHook>(plugin.scratchpad(), htrack_CGameMovement_CheckStuck, (void*) &hook_CGameMovement_CheckStuck, -100000);
 
-    //Detour the portal_use_player_avoidance cvar check in CPortal_Player::ShouldCollide
     CHookTracker& htrack_CPortal_Player_ShouldCollide = anchors::server::CPortal_Player::ShouldCollide.hook_tracker(plugin.server_module());
     plugin.register_patch<CFuncHook>(plugin.scratchpad(), htrack_CPortal_Player_ShouldCollide, (void*) &hook_CPortal_Player_ShouldCollide);
 }
@@ -81,7 +81,7 @@ HOOK_FUNC bool CPlayerStuckPatch::hook_CPortal_Player_ShouldCollide(HOOK_ORIG bo
     int& m_StuckLast = *(int*) ((uint8_t*) player + OFF_CBasePlayer_m_StuckLast);
 
     //Check if we're colliding with another player
-    if(collisionGroup != COLLISION_GROUP_PLAYER && collisionGroup != COLLISION_GROUP_PLAYER_MOVEMENT) {
+    if(collisionGroup != COLLISION_GROUP_PLAYER && collisionGroup != COLLISION_GROUP_PLAYER_MOVEMENT) {    
         return orig(player, collisionGroup, contentsMask);
     }
 

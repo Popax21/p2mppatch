@@ -2,7 +2,19 @@
 #include <vector>
 #include "detour.hpp"
 
-SAnchor CScratchDetourSeq::update_scratch_seq(IByteSequence& seq) {
+void CScratchDetourSeq::update_detour_anchor(SAnchor anchor) {
+    if(!m_DetourSeq) return;
+
+    //Update the scratchpad entry
+    CSequentialByteSequence scratch_seq;
+    scratch_seq.add_sequence(&*m_DetourSeq, false);
+    if(m_DetourJumpBack) scratch_seq.add_sequence(new SEQ_JMP(anchor + m_DetourSize));
+
+    SAnchor scratch_anchor = set_scratch_seq(scratch_seq);
+    DevMsg("Prepared detour from %s to scratchpad entry at %s\n", anchor.debug_str().c_str(), scratch_anchor.debug_str().c_str());
+}
+
+SAnchor CScratchDetourSeq::set_scratch_seq(IByteSequence& seq) {
     //Allocate the sequence on the scratchpad
     m_ScratchPadEntry = m_ScratchPad.alloc_seq(seq);
 
@@ -11,13 +23,14 @@ SAnchor CScratchDetourSeq::update_scratch_seq(IByteSequence& seq) {
         auto jump_seq = std::unique_ptr<CSequentialByteSequence>(new CSequentialByteSequence());
         jump_seq->add_sequence(new SEQ_JMP(m_ScratchPadEntry.anchor()));
         jump_seq->emplace_sequence<CFillSequence>(m_DetourSize - MIN_SIZE, 0x90); //Fill with NOPs
-        m_DetourJumpSeq = std::unique_ptr<IByteSequence>(jump_seq.release());
+        m_ScratchJumpSeq = std::unique_ptr<IByteSequence>(jump_seq.release());
     } else {
-        m_DetourJumpSeq = std::unique_ptr<CRefInstructionSequence>(new SEQ_JMP(m_ScratchPadEntry.anchor()));
+        m_ScratchJumpSeq = std::unique_ptr<CRefInstructionSequence>(new SEQ_JMP(m_ScratchPadEntry.anchor()));
     }
-    assert(m_DetourJumpSeq->size() == m_DetourSize);
+    assert(m_ScratchJumpSeq->size() == m_DetourSize);
 
-    if(m_DetourAnchor && !m_DetourJumpSeq->apply_anchor(m_DetourAnchor)) throw std::runtime_error("Failed to re-anchor scratchpad jump after scratch sequence update");
+    //Re-anchor the detour jump sequence
+    if(m_DetourAnchor) m_ScratchJumpSeq->apply_anchor(m_DetourAnchor);
 
     return m_ScratchPadEntry.anchor();
 }
@@ -26,11 +39,13 @@ const CFuncDetour::SArgument CFuncDetour::SArgument::reg_eax(CFuncDetour::SArgum
 const CFuncDetour::SArgument CFuncDetour::SArgument::reg_ebx(CFuncDetour::SArgument::EType::REG, 3);
 const CFuncDetour::SArgument CFuncDetour::SArgument::reg_ecx(CFuncDetour::SArgument::EType::REG, 1);
 const CFuncDetour::SArgument CFuncDetour::SArgument::reg_edx(CFuncDetour::SArgument::EType::REG, 2);
+const CFuncDetour::SArgument CFuncDetour::SArgument::reg_esp(CFuncDetour::SArgument::EType::REG, 4);
+const CFuncDetour::SArgument CFuncDetour::SArgument::reg_ebp(CFuncDetour::SArgument::EType::REG, 5);
 const CFuncDetour::SArgument CFuncDetour::SArgument::reg_esi(CFuncDetour::SArgument::EType::REG, 6);
 const CFuncDetour::SArgument CFuncDetour::SArgument::reg_edi(CFuncDetour::SArgument::EType::REG, 7);
 const CFuncDetour::SArgument CFuncDetour::SArgument::reg_eip(CFuncDetour::SArgument::EType::REG, -1);
 
-bool CFuncDetour::apply_anchor(SAnchor anchor) {
+void CFuncDetour::update_detour_anchor(SAnchor anchor) {
     //Build the scratchpad sequence
     CSequentialByteSequence scratch_seq;
 
@@ -112,9 +127,6 @@ bool CFuncDetour::apply_anchor(SAnchor anchor) {
     else scratch_seq.add_sequence(new SEQ_JMP(ret_addr));
 
     //Update the scratchpad sequence
-    SAnchor scratch_anchor = update_scratch_seq(scratch_seq);
+    SAnchor scratch_anchor = set_scratch_seq(scratch_seq);
     DevMsg("Prepared detour from %s to function at %p via scratchpad shim at %s\n", anchor.debug_str().c_str(), m_DetourFunc, scratch_anchor.debug_str().c_str());
-
-    //Call the original anchoring code
-    return CScratchDetourSeq::apply_anchor(anchor);
 }

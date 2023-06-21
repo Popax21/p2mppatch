@@ -1,7 +1,9 @@
 #ifndef H_P2MPPATCH_PATCHES_TRANSITIONS_FIX
 #define H_P2MPPATCH_PATCHES_TRANSITIONS_FIX
 
+#include <assert.h>
 #include <set>
+#include <stdexcept>
 #include "patch.hpp"
 #include "detour.hpp"
 #include "hook.hpp"
@@ -16,7 +18,18 @@ namespace patches {
 
             virtual void register_patches(CMPPatchPlugin& plugin) override;
 
+            virtual void after_patch_status_change(CMPPatchPlugin& plugin, bool applied) override {
+                is_applied = applied;
+            }
+
+            inline static bool is_everyone_ready(void *rules) {
+                if(!is_applied) throw std::runtime_error("CTransitionsFixPatch is currently not applied");
+                return get_rules_ready_tracker(rules)->is_everyone_ready();
+            }
+
         private:
+            static bool is_applied;
+
             static int OFF_CPortalMPGameRules_m_bDataReceived;
 
             static IServer *glob_sv;

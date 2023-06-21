@@ -4,7 +4,7 @@ STEAM_RUNTIME_PATH ?= $(realpath ../runtime)
 
 all: $(PLUGIN)
 
-SRC := compat.cpp plugin.cpp byteseq.cpp module.cpp anchor.cpp sufarr.cpp scratchpad.cpp patch.cpp detour.cpp hook.cpp patches/anchors.cpp patches/transitions_fix.cpp patches/player_stuck.cpp
+SRC := compat.cpp plugin.cpp byteseq.cpp module.cpp anchor.cpp sufarr.cpp scratchpad.cpp patch.cpp detour.cpp hook.cpp patches/anchors.cpp patches/transitions_fix.cpp patches/player_stuck.cpp patches/player_spawn.cpp
 SRC := $(addprefix src/, $(SRC))
 OBJ := $(addprefix obj/, $(SRC:.cpp=.o))
 

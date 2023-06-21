@@ -13,6 +13,7 @@
 #include "patches/player_count.hpp"
 #include "patches/dc_check.hpp"
 #include "patches/transitions_fix.hpp"
+#include "patches/player_spawn.hpp"
 #include "patches/player_stuck.hpp"
 #include "patches/env_fade.hpp"
 
@@ -53,6 +54,8 @@ void CMPPatchPlugin::update_patches() {
 }
 
 //Server callbacks
+#define INTERFACEVERSION_ENGINETRACE_SERVER "EngineTraceServer004"
+
 bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory) {
     if(m_LoadCount++ > 0) {
         Warning("P2MPPatch plugin is already loaded!\n");
@@ -64,9 +67,14 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
 
     //Get interfaces
     if(!(m_PlayerInfoManager = (IPlayerInfoManager*) gameServerFactory(INTERFACEVERSION_PLAYERINFOMANAGER, nullptr))) {
-        Warning("Couldn't obtain IPlayerInfoManager [%s] interface!", INTERFACEVERSION_PLAYERINFOMANAGER);
+        Warning("Couldn't obtain IPlayerInfoManager [%s] interface!\n", INTERFACEVERSION_PLAYERINFOMANAGER);
         return false;
     } else DevMsg("IPlayerInfoManager: %p\n", m_PlayerInfoManager);
+
+    if(!(m_EngineTrace = interfaceFactory(INTERFACEVERSION_ENGINETRACE_SERVER, nullptr))) {
+        Warning("Couldn't obtain IEngineTrace [%s] interface!\n", INTERFACEVERSION_ENGINETRACE_SERVER);
+        return false;
+    } else DevMsg("IEngineTrace: %p\n", m_EngineTrace);
 
     try {
         //Prepare modules
@@ -80,6 +88,7 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
         m_PatchRegistrars.emplace_back(new patches::CPlayerCountPatch(MAX_PLAYERS));
         m_PatchRegistrars.emplace_back(new patches::CDCCheckPatch());
         m_PatchRegistrars.emplace_back(new patches::CTransitionsFixPatch());
+        m_PatchRegistrars.emplace_back(new patches::CPlayerSpawnPatch());
         m_PatchRegistrars.emplace_back(new patches::CPlayerStuckPatch());
         m_PatchRegistrars.emplace_back(new patches::CEnvFadePatch());
 
@@ -140,9 +149,9 @@ void CMPPatchPlugin::clear_patches() {
     }
 
     //Reset dependents
-    m_EngineModule->reset_dependents();
-    m_MatchMakingModule->reset_dependents();
-    m_ServerModule->reset_dependents();
+    if(m_EngineModule) m_EngineModule->reset_dependents();
+    if(m_MatchMakingModule) m_MatchMakingModule->reset_dependents();
+    if(m_ServerModule) m_ServerModule->reset_dependents();
 }
 
 void CMPPatchPlugin::Pause() {}

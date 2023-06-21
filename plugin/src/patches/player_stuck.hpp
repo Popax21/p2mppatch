@@ -1,7 +1,8 @@
 #ifndef H_P2MPPATCH_PATCHES_PLAYER_STUCK
 #define H_P2MPPATCH_PATCHES_PLAYER_STUCK
 
-#include <map>
+#include <edict.h>
+#include <tier0/valve_minmax_off.h>
 #include "patch.hpp"
 #include "hook.hpp"
 

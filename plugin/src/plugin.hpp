@@ -16,6 +16,7 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         static const uint8_t MAX_PLAYERS = 0x20;
 
         CGlobalVars *get_globals() const { return m_PlayerInfoManager->GetGlobalVars(); }
+        void *engine_trace() const { return m_EngineTrace; }
 
         //Patches
         void update_patches();
@@ -60,6 +61,7 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
     private:
         int m_LoadCount;
         IPlayerInfoManager *m_PlayerInfoManager;
+        void *m_EngineTrace;
 
         CScratchPad m_ScratchPad;
         CModule *m_EngineModule, *m_MatchMakingModule, *m_ServerModule;

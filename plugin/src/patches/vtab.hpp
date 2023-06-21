@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+struct Ray_t;
+class CGameTrace;
+typedef CGameTrace trace_t;
+class ITraceFilter;
+
 namespace patches::vtabs {
     #define PATCH_VTAB_FUNC(obj, func) ((patches::vtabs::func##_FTYPE) (*(void***) (obj))[patches::vtabs::func##_IDX])
 
@@ -10,15 +15,19 @@ namespace patches::vtabs {
         const int name##_IDX = idx; \
         typedef ret_type (*name##_FTYPE)(void *self);
 
-    #define PATCH_DECL_VTAB_FUNC_ARGS(name, idx, ret_type, args) \
+    #define PATCH_DECL_VTAB_FUNC_ARGS(name, idx, ret_type, ...) \
         const int name##_IDX = idx; \
-        typedef ret_type (*name##_FTYPE)(void *self, args);
+        typedef ret_type (*name##_FTYPE)(void *self, __VA_ARGS__);
 
     //>>>>> server vtables <<<<<
 
     namespace server {
         namespace CGameRules {
             PATCH_DECL_VTAB_FUNC(IsMultiplayer, 34, bool);
+        }
+
+        namespace CBaseEntity {
+            PATCH_DECL_VTAB_FUNC_ARGS(SetParent, 39, void, void *pNewParent, int iAttachment);   
         }
     }
 
@@ -43,6 +52,15 @@ namespace patches::vtabs {
             PATCH_DECL_VTAB_FUNC_ARGS(GetActiveServerGameDetails, 1, void*, void *pRequest);
             PATCH_DECL_VTAB_FUNC_ARGS(UnpackGameDetailsFromSteamLobby, 3, void*, uint64_t uiLobbyI);
             PATCH_DECL_VTAB_FUNC_ARGS(PackageGameDetailsForReservation, 5, void*, void *pSettings);
+        }
+    }
+
+    //>>>>> engine vtables <<<<<
+
+    namespace engine {
+        //This interface mismatches the one our SDK ships with ._:
+        namespace IEngineTrace {
+            PATCH_DECL_VTAB_FUNC_ARGS(TraceRay, 5, void, const Ray_t &ray, unsigned int fMask, ITraceFilter *pTraceFilter, trace_t *pTrace);
         }
     }
 }

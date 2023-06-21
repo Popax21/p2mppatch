@@ -35,6 +35,7 @@ namespace patches::anchors {
         SGlobVarAnchor g_pMatchFramework("g_pMatchFramework", CProp_Portal::Spawn, 0x4c, "a1 ?? ?? ?? ??", 1);
 
         SFuncAnchor UTIL_PlayerByIndex("UTIL_PlayerByIndex", "39 50 14 7c 2e 8b 40 58 85 c0 74 22 c1 e2 04 01 d0 f6 00 02", 0xd);
+        SFuncAnchor UTIL_DropToFloor("UTIL_DropToFloor", "55 57 56 53 83 ec 74 8b b4 24 88 00 00 00 6a 00 56 8d 9e d4 01 00 00");
 
         SFuncAnchor FUNC_numSlots_adj("FUNC_numSlots_adj", "83 ec 0c 8b 10 50 ff 52 10 83 c4 10 89 c7 85 c0 74 12", 0x75);
 
@@ -64,25 +65,37 @@ namespace patches::anchors {
         SFuncAnchor ServerClassInit_DT_BaseEntity("ServerClassInit<DT_BaseEntity>", "83 c4 1c 6a 20 6a 00 6a 01 6a 05 6a 04 68 c0 02 00 00", 0xb5);
         namespace CBaseEntity {
             SMemberOffAnchor m_MoveType("CBaseEntity::m_MoveType", ServerClassInit_DT_BaseEntity, 0x3ba, "68 ?? ?? ?? ??", 1);
+            SMemberOffAnchor m_CollisionGroup("CBaseEntity::m_CollisionGroup", SetCollisionGroup, 0xf, "39 b3 ?? ?? ?? ??", 2);
+            SFuncAnchor SetMoveType("CBaseEntity::SetMoveType", "55 57 56 53 83 ec 2c 8b 5c 24 40 8b 7c 24 44 8b 74 24 48 0f b6 8b e2 00 00 00 39 f9");
+            SFuncAnchor SetCollisionGroup("CBaseEntity::SetCollisionGroup", "55 57 56 53 83 ec 1c 8b 5c 24 30 8b 74 24 34 39 b3 50 01 00 00");
 
             SFuncAnchor ThinkSet("CBaseEntity::ThinkSet", "55 57 56 53 83 ec 1c 8b 74 24 44 f3 0f 7e 44 24 38");
             SFuncAnchor SetNextThink("CBaseEntity::SetNextThink", "f3 0f 10 44 24 34 8b 6c 24 30 0f 2e c1 8b 74 24 38", 0x7);
+
+            SFuncAnchor GetGroundEntity("CBaseEntity::GetGroundEntity", "8b 80 60 01 00 00 83 f8 ff 74 1b 0f b7 d0 c1 e8 10 8d 14 52 8d 0c d1", 0xa);
         }
 
+        SGlobVarAnchor g_pLastSpawn("g_pLastSpawn", CPortal_Player::EntSelectSpawnPoint, 0x47, "8b 1d ?? ?? ?? ??", 2);
+
         namespace CPortal_Player {
+            SFuncAnchor EntSelectSpawnPoint("CPortal_Player::EntSelectSpawnPoint", "57 56 53 8b 7c 24 10 83 ec 0c 8b 10 50", 0x5);
             SFuncAnchor Spawn("CPortal_Player::Spawn", "8b 03 89 1c 24 ff 90 3c 08 00 00 83 c4 10 80 bb 10 0b 00 00 00", 0x62);
+
             SFuncAnchor ShouldCollide("CPortal_Player::ShouldCollide", "53 8b 4c 24 08 8b 44 24 0c 8b 5c 24 10 8b 52 30", "8b 15 ?? ?? ?? ??", 0x6);
 
             SFuncAnchor ClientCommand("CPortal_Player::ClientCommand", "55 89 e5 57 56 53 81 ec 9c 00 00 00 8b 7d 0c 8b 5d 08 8b 07 85 c0");
 
             SFuncAnchor OnFullyConnected("CPortal_Player::OnFullyConnected", "8b 5c 24 4c 8b 10 50 ff 92 88 00 00 00 83 c4 10 84 c0", 0xc);
-
             SFuncAnchor PlayerTransitionCompleteThink("CPortal_Player::PlayerTransitionCompleteThink", "8b 5c 24 28 8b 10 68 00 00 f8 3f 6a 00", 0xa);
         }
 
         namespace CProp_Portal {
             SFuncAnchor Spawn("CProp_Portal::Spawn", "53 83 ec 14 8b 5c 24 1c 8b 03 53 ff 50 68 89 1c 24");
             SFuncAnchor DispatchPortalPlacementParticles("CProp_Portal::DispatchPortalPlacementParticles", "8b 5d 0c 8b 10 50 ff 92 88 00 00 00 83 c4 10 84 c0", 0xe);
+        }
+
+        namespace CPointTeleport {
+            SFuncAnchor DoTeleport("CPointTeleport::DoTeleport", "55 57 56 53 83 ec 1c 8b 44 24 34 80 7c 24 40 00");
         }
 
         namespace CEnvFade {

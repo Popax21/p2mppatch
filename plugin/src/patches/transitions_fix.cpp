@@ -10,6 +10,8 @@
 
 using namespace patches;
 
+bool CTransitionsFixPatch::is_applied;
+
 CTransitionsFixPatch::SReadyTracker *CTransitionsFixPatch::tracker_slots[NUM_TRACKER_SLOTS];
 
 int CTransitionsFixPatch::OFF_CPortalMPGameRules_m_bDataReceived;

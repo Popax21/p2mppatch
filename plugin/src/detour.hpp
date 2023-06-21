@@ -12,16 +12,16 @@ class CScratchDetourSeq : public IByteSequence {
     public:
         static const int MIN_SIZE = 5;
 
-        CScratchDetourSeq(CScratchPad& scratch, int size, IByteSequence *scratch_seq) : CScratchDetourSeq(scratch, size) {
-            m_ScratchSeq = std::unique_ptr<IByteSequence>(scratch_seq);
-            DevMsg("Prepared detour scratchpad entry %s (%d bytes)\n", update_scratch_seq(*scratch_seq).debug_str().c_str(), size);
+        CScratchDetourSeq(CScratchPad& scratch, int size, IByteSequence *scratch_seq, bool jump_back = true) : CScratchDetourSeq(scratch, size) {
+            m_DetourSeq = std::unique_ptr<IByteSequence>(scratch_seq);
+            m_DetourJumpBack = jump_back;
         }
 
         const CScratchPad::SSeqEntry& scratch_entry() const { return m_ScratchPadEntry; }
 
         virtual bool has_data() const override {
             check_has_seq();
-            return m_DetourJumpSeq->has_data();
+            return m_ScratchJumpSeq->has_data();
         }
 
         virtual size_t size() const override {
@@ -30,52 +30,57 @@ class CScratchDetourSeq : public IByteSequence {
 
         virtual const uint8_t *buffer() const override {
             check_has_seq();
-            return m_DetourJumpSeq->buffer();
+            return m_ScratchJumpSeq->buffer();
         }
 
-        virtual bool apply_anchor(SAnchor anchor) override {
-            if(m_DetourJumpSeq && !m_DetourJumpSeq->apply_anchor(anchor)) return false;
+        virtual void apply_anchor(SAnchor anchor) override {
+            update_detour_anchor(anchor);
+            if(m_ScratchJumpSeq) m_ScratchJumpSeq->apply_anchor(anchor);
             m_DetourAnchor = anchor;
-            return true;
         }
 
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override {
             check_has_seq();
-            return m_DetourJumpSeq->compare(seq, this_off, seq_off, size);
+            return m_ScratchJumpSeq->compare(seq, this_off, seq_off, size);
         }
 
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const override {
             check_has_seq();
-            return m_DetourJumpSeq->compare(buf, off, size);
+            return m_ScratchJumpSeq->compare(buf, off, size);
         }
 
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const override {
             check_has_seq();
-            m_DetourJumpSeq->get_data(buf, off, size);
+            m_ScratchJumpSeq->get_data(buf, off, size);
         }
     
         virtual uint8_t operator [](size_t off) const override {
             check_has_seq();
-            return (*m_DetourJumpSeq)[off];
+            return (*m_ScratchJumpSeq)[off];
         }
 
     protected:
-        CScratchDetourSeq(CScratchPad& scratch, int size) : m_ScratchPad(scratch), m_DetourSize(size), m_ScratchSeq(nullptr), m_DetourJumpSeq(nullptr) {
+        CScratchDetourSeq(CScratchPad& scratch, int size) : m_ScratchPad(scratch), m_DetourSize(size), m_DetourSeq(nullptr), m_DetourJumpBack(false), m_ScratchJumpSeq(nullptr) {
             if(size < MIN_SIZE) throw std::runtime_error("Invalid detour patchsite size");
         }
 
         inline SAnchor cur_anchor() const { return m_DetourAnchor; }
-        SAnchor update_scratch_seq(IByteSequence& seq);
+        virtual void update_detour_anchor(SAnchor anchor);
+
+        SAnchor set_scratch_seq(IByteSequence& seq);
 
     private:
         CScratchPad& m_ScratchPad;
         int m_DetourSize;
+        std::unique_ptr<IByteSequence> m_DetourSeq;
+        bool m_DetourJumpBack;
+
         CScratchPad::SSeqEntry m_ScratchPadEntry;
-        std::unique_ptr<IByteSequence> m_ScratchSeq, m_DetourJumpSeq;
+        std::unique_ptr<IByteSequence> m_ScratchJumpSeq;
         SAnchor m_DetourAnchor;
 
         inline void check_has_seq() const {
-            if(m_DetourJumpSeq == nullptr) throw std::runtime_error("CScratchDetour has not been given a scratch sequence yet");
+            if(m_ScratchJumpSeq == nullptr) throw std::runtime_error("CScratchDetour has not been given a scratch sequence yet");
         }
 };
 
@@ -94,7 +99,7 @@ class CFuncDetour : public CScratchDetourSeq {
             inline bool operator ==(SArgument other) const { return type == other.type && val == other.val; }
             inline bool operator !=(SArgument other) const { return !(*this == other); }
 
-            static const SArgument reg_eax, reg_ebx, reg_ecx, reg_edx, reg_esi, reg_edi, reg_eip;
+            static const SArgument reg_eax, reg_ebx, reg_ecx, reg_edx, reg_esp, reg_ebp, reg_esi, reg_edi, reg_eip;
 
             static inline SArgument local_var(int ebp_off) { return SArgument(EType::LOCAL_VAR, ebp_off); };
             static inline SArgument stack_var(int esp_off) { return SArgument(EType::STACK_VAR, esp_off); };
@@ -126,7 +131,8 @@ class CFuncDetour : public CScratchDetourSeq {
             return this;
         }
 
-        virtual bool apply_anchor(SAnchor anchor) override;
+    protected:
+        virtual void update_detour_anchor(SAnchor anchor) override;
 
     private:
         inline void reapply_anchor() {
@@ -144,6 +150,8 @@ class CFuncDetour : public CScratchDetourSeq {
 #define DETOUR_ARG_EBX CFuncDetour::SArgument::reg_ebx
 #define DETOUR_ARG_ECX CFuncDetour::SArgument::reg_ecx
 #define DETOUR_ARG_EDX CFuncDetour::SArgument::reg_edx
+#define DETOUR_ARG_ESP CFuncDetour::SArgument::reg_esp
+#define DETOUR_ARG_EBP CFuncDetour::SArgument::reg_ebp
 #define DETOUR_ARG_ESI CFuncDetour::SArgument::reg_esi
 #define DETOUR_ARG_EDI CFuncDetour::SArgument::reg_edi
 #define DETOUR_ARG_EIP CFuncDetour::SArgument::reg_eip
@@ -151,6 +159,7 @@ class CFuncDetour : public CScratchDetourSeq {
 #define DETOUR_ARG_STACK(esp_off) CFuncDetour::SArgument::stack_var(esp_off)
 
 #define SEQ_SCRATCH_DETOUR(plugin, size, seq) CScratchDetourSeq(plugin.scratchpad(), size, seq)
+#define SEQ_SCRATCH_DETOUR_NRET(plugin, size, seq) CScratchDetourSeq(plugin.scratchpad(), size, seq, false)
 #define SEQ_FUNC_DETOUR(plugin, size, func, ...) CFuncDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ })
 
 #endif

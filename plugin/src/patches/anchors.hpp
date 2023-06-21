@@ -120,6 +120,7 @@ namespace patches::anchors {
         extern SGlobVarAnchor g_pMatchFramework;
 
         extern SFuncAnchor UTIL_PlayerByIndex;
+        extern SFuncAnchor UTIL_DropToFloor;
 
         extern SFuncAnchor FUNC_numSlots_adj;
 
@@ -149,25 +150,37 @@ namespace patches::anchors {
         extern SFuncAnchor ServerClassInit_DT_BaseEntity;
         namespace CBaseEntity {
             extern SMemberOffAnchor m_MoveType;
+            extern SMemberOffAnchor m_CollisionGroup;
+            extern SFuncAnchor SetMoveType;
+            extern SFuncAnchor SetCollisionGroup;
 
             extern SFuncAnchor ThinkSet;
             extern SFuncAnchor SetNextThink;
+
+            extern SFuncAnchor GetGroundEntity;
         }
 
+        extern SGlobVarAnchor g_pLastSpawn;
+
         namespace CPortal_Player {
+            extern SFuncAnchor EntSelectSpawnPoint;
             extern SFuncAnchor Spawn;
+
             extern SFuncAnchor ShouldCollide;
 
             extern SFuncAnchor ClientCommand;
 
             extern SFuncAnchor OnFullyConnected;
-
             extern SFuncAnchor PlayerTransitionCompleteThink;
         }
 
         namespace CProp_Portal {
             extern SFuncAnchor Spawn; //Only used to find g_pMatchFramework 
             extern SFuncAnchor DispatchPortalPlacementParticles; //Only used to find g_pGameRules
+        }
+
+        namespace CPointTeleport {
+            extern SFuncAnchor DoTeleport;
         }
 
         namespace CEnvFade {

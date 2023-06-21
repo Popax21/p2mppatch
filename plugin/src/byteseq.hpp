@@ -20,7 +20,7 @@ class IByteSequence {
         virtual size_t size() const = 0;
         virtual const uint8_t *buffer() const { return nullptr; }
 
-        virtual bool apply_anchor(SAnchor anchor) { return true; }
+        virtual void apply_anchor(SAnchor anchor) {}
 
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
             if(!seq.has_data()) return seq.compare(*this, seq_off, this_off, size);
@@ -57,7 +57,7 @@ class CByteSequenceWrapper : public IByteSequence {
         virtual size_t size() const override { return m_WrappedSeq.size(); }
         virtual const uint8_t *buffer() const override { return m_WrappedSeq.buffer(); }
 
-        virtual bool apply_anchor(SAnchor anchor) override { return m_WrappedSeq.apply_anchor(anchor); }
+        virtual void apply_anchor(SAnchor anchor) override { m_WrappedSeq.apply_anchor(anchor); }
 
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override { return m_WrappedSeq.compare(seq, this_off, seq_off, size); }
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const override { return m_WrappedSeq.compare(buf, off, size); }
@@ -90,7 +90,7 @@ class CSequentialByteSequence : public IByteSequence {
 
         virtual size_t size() const override { return m_Size; };
 
-        virtual bool apply_anchor(SAnchor anchor) override;
+        virtual void apply_anchor(SAnchor anchor) override;
 
         virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override;
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const override;
@@ -241,10 +241,9 @@ class CRefInstructionSequence : public IByteSequence {
 
         virtual size_t size() const override { return m_Opcode.size() + sizeof(size_t); };
 
-        virtual bool apply_anchor(SAnchor anchor) override {
+        virtual void apply_anchor(SAnchor anchor) override {
             m_IsAnchored = true;
             m_InstrAnchor = anchor;
-            return true;
         }
 
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const override {

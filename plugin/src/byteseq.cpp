@@ -1,12 +1,11 @@
 #include <stdexcept>
 #include "byteseq.hpp"
 
-bool CSequentialByteSequence::apply_anchor(SAnchor anchor) {
+void CSequentialByteSequence::apply_anchor(SAnchor anchor) {
     for(int i = 0; i < m_Sequences.size(); i++) {
         const SSeqEntry& ent = m_Sequences[i];
-        if(!ent.seq->apply_anchor(anchor + ent.off)) return false;
+        ent.seq->apply_anchor(anchor + ent.off);
     }
-    return true;
 }
 
 int CSequentialByteSequence::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {

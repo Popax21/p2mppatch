@@ -22,7 +22,7 @@ void CHookTracker::prepare(CMPPatchPlugin& plugin) {
 
     //Setup the detour trampoline and register the detour patch
     void *trampoline_link_ptr = &m_FirstTrampoline;
-    CScratchDetourSeq *scratch_detour = new SEQ_SCRATCH_DETOUR(plugin, detour_size, new SEQ_HEX("ff 25 $4", &trampoline_link_ptr)); //jmp dword [m_FirstTrampoline]
+    CScratchDetourSeq *scratch_detour = new SEQ_SCRATCH_DETOUR_NRET(plugin, detour_size, new SEQ_HEX("ff 25 $4", &trampoline_link_ptr)); //jmp dword [m_FirstTrampoline]
     plugin.register_patch(m_DetourPatchTracker.create_tracked_patch<CSeqPatch>(m_HookedFunc, new SEQ_WRAP(m_HookedFuncStartOrig), scratch_detour));
     
     DevMsg("Prepared hook tracker for function %s: detour trampoline at %s, orig trampoline at %s\n", m_HookedFunc.debug_str().c_str(), scratch_detour->scratch_entry().anchor().debug_str().c_str(), m_OrigTrampoline.anchor().debug_str().c_str());
