@@ -19,7 +19,7 @@ class CScratchPad {
                 SAnchor anchor() const { return m_Anchor; }
                 size_t seq_size() const { return m_SeqSize; }
 
-                SSeqEntry& operator =(SSeqEntry&& v) {
+                inline SSeqEntry& operator =(SSeqEntry&& v) {
                     if(m_ScratchPad) m_ScratchPad->free_entry(*this);
                     m_ScratchPad = v.m_ScratchPad;
                     m_PageIdx = v.m_PageIdx;
@@ -28,6 +28,8 @@ class CScratchPad {
                     v.m_ScratchPad = nullptr;
                     return *this;
                 }
+
+                inline operator bool() const { return m_ScratchPad != nullptr; }
 
             private:
                 SSeqEntry(CScratchPad *scratch, int page_idx, SAnchor anchor, size_t seq_size) : m_ScratchPad(scratch), m_PageIdx(page_idx), m_Anchor(anchor), m_SeqSize(seq_size) {}

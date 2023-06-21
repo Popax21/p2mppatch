@@ -3,7 +3,7 @@
 
 bool CSequentialByteSequence::apply_anchor(SAnchor anchor) {
     for(int i = 0; i < m_Sequences.size(); i++) {
-        const seq_ent& ent = m_Sequences[i];
+        const SSeqEntry& ent = m_Sequences[i];
         if(!ent.seq->apply_anchor(anchor + ent.off)) return false;
     }
     return true;
@@ -11,7 +11,7 @@ bool CSequentialByteSequence::apply_anchor(SAnchor anchor) {
 
 int CSequentialByteSequence::compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const {
     while(size > 0) {
-        const seq_ent& seq_ent = get_sequence(this_off);
+        const SSeqEntry& seq_ent = get_sequence(this_off);
 
         size_t sz = std::min(seq_ent.seq->size(), size);
         int r = seq_ent.seq->compare(seq, this_off - seq_ent.off, seq_off, sz);
@@ -26,7 +26,7 @@ int CSequentialByteSequence::compare(const IByteSequence &seq, size_t this_off, 
 
 int CSequentialByteSequence::compare(const uint8_t *buf, size_t off, size_t size) const {
     while(size > 0) {
-        const seq_ent& seq_ent = get_sequence(off);
+        const SSeqEntry& seq_ent = get_sequence(off);
 
         size_t sz = std::min(seq_ent.seq->size(), size);
         int r = seq_ent.seq->compare(buf, off - seq_ent.off, sz);
@@ -41,7 +41,7 @@ int CSequentialByteSequence::compare(const uint8_t *buf, size_t off, size_t size
 
 void CSequentialByteSequence::get_data(uint8_t *buf, size_t off, size_t size) const {
     while(size > 0) {
-        const seq_ent& seq_ent = get_sequence(off);
+        const SSeqEntry& seq_ent = get_sequence(off);
 
         size_t sz = std::min(seq_ent.seq->size(), size);
         seq_ent.seq->get_data(buf, off - seq_ent.off, sz);
@@ -52,7 +52,7 @@ void CSequentialByteSequence::get_data(uint8_t *buf, size_t off, size_t size) co
     }
 }
 
-const CSequentialByteSequence::seq_ent& CSequentialByteSequence::get_sequence(size_t off) const {
+const CSequentialByteSequence::SSeqEntry& CSequentialByteSequence::get_sequence(size_t off) const {
     int s = 0, e = m_Sequences.size();
     while(s < e-1) {
         int m = s + (e-s) / 2;

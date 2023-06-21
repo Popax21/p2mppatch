@@ -34,10 +34,12 @@ struct SAnchor {
 
     inline bool operator ==(const SAnchor &o) const { return module == o.module && offset == o.offset; }
     inline bool operator !=(const SAnchor &o) const { return !(*this == o); }
- 
-    inline bool operator ==(void *o) const { return get_addr() == o; }
-    inline bool operator !=(void *o) const { return get_addr() != o; }
 };
+
+inline bool operator ==(void *o, const SAnchor& a) { return a.get_addr() == o; }
+inline bool operator ==(const SAnchor& a, void *o) { return a.get_addr() == o; }
+inline bool operator !=(void *o, const SAnchor& a) { return a.get_addr() != o; }
+inline bool operator !=(const SAnchor& a, void *o) { return a.get_addr() != o; }
 
 inline std::ostream& operator <<(std::ostream& stream, SAnchor anchor) {
     return stream << anchor.debug_str();

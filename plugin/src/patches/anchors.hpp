@@ -4,23 +4,42 @@
 #include <tier0/dbg.h>
 #include <tier0/valve_minmax_off.h>
 
-#include <type_traits>
+#include <memory>
 #include <stdexcept>
 #include <sstream>
+#include <type_traits>
 #include "byteseq.hpp"
 #include "patch.hpp"
+#include "hook.hpp"
 
 namespace patches::anchors {
     struct SFuncAnchor : public IModuleFact<SAnchor> {
         public:
             SFuncAnchor(const char *name, const char *hex_seq, int off = 0) : m_Name(name), m_Sequence(hex_seq), m_Offset(off) {}
+            SFuncAnchor(const char *name, const char *hex_seq, const char *begin_hex_seq, int off = 0) : SFuncAnchor(name, hex_seq, off) {
+                m_FuncBeginSequence = std::make_unique<CHexSequence>(begin_hex_seq);
+                m_HookTrackerFact = std::make_unique<CHookTrackerFact>(*this, *m_FuncBeginSequence);
+            }
 
-            const char *fact_name() const override { return m_Name; }
+            virtual const char *fact_name() const override { return m_Name; }
+
+            CHookTracker& hook_tracker(CModule& module) const {
+                if(!m_HookTrackerFact) {
+                    std::stringstream sstream;
+                    sstream << "Function '" << m_Name << "' has not been set up with support for hooking";
+                    throw std::runtime_error(sstream.str());
+                }
+
+                return m_HookTrackerFact->get(module);
+            }
 
         private:
             const char *m_Name;
             CHexSequence m_Sequence;
             int m_Offset;
+
+            std::unique_ptr<CHexSequence> m_FuncBeginSequence;
+            std::unique_ptr<CHookTrackerFact> m_HookTrackerFact;
 
             virtual SAnchor determine_value(CModule& module) override {
                 try {
@@ -57,7 +76,7 @@ namespace patches::anchors {
         public:
             SGlobVarAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_ptr_off) : SRefInstrAnchor(name, func, instr_off, instr_hex_seq, instr_ptr_off), m_Name(name) {}
 
-            const char *fact_name() const override { return m_Name; }
+            virtual const char *fact_name() const override { return m_Name; }
 
         private:
             const char *m_Name;
@@ -82,7 +101,7 @@ namespace patches::anchors {
         public:
             SMemberOffAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_ptr_off) : SRefInstrAnchor(name, func, instr_off, instr_hex_seq, instr_ptr_off), m_Name(name) {}
         
-            const char *fact_name() const override { return m_Name; }
+            virtual const char *fact_name() const override { return m_Name; }
 
         private:
             const char *m_Name;

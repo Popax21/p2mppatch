@@ -1,4 +1,6 @@
 #include <tier0/dbg.h>
+#include <tier0/valve_minmax_on.h>
+
 #include <sstream>
 #include "patch.hpp"
 
@@ -19,9 +21,8 @@ CSeqPatch::CSeqPatch(CSeqPatch&& patch) : m_PatchTarget(patch.m_PatchTarget), m_
 }
 
 CSeqPatch::~CSeqPatch() {
-    if(m_IsApplied) revert();
-
-    if(m_OrigData) delete[] m_OrigData;
+    assert(!m_IsApplied);
+    delete[] m_OrigData;
     m_OrigData = nullptr;
 }
 

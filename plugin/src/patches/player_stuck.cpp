@@ -25,11 +25,9 @@ void CPlayerStuckPatch::register_patches(CMPPatchPlugin& plugin) {
     ptr_g_pGameRules = (void**) anchors::server::g_pGameRules.get(plugin.server_module()).get_addr();
     glob_sv = (IServer*) anchors::engine::sv.get(plugin.engine_module()).get_addr();
 
-    //Detour the start of CGameMovement::CheckStuck
-    SAnchor CGameMovement_CheckStuck = anchors::server::CGameMovement::CheckStuck.get(plugin.server_module());
-    plugin.register_patch<CSeqPatch>(CGameMovement_CheckStuck + 0xa, new SEQ_MASKED_HEX("a1 ?? ?? ?? ??"),
-        (new SEQ_FUNC_DETOUR(plugin, 5, detour_CGameMovement_CheckStuck, DETOUR_ARG_STACK(0xb0), DETOUR_ARG_ESI, DETOUR_ARG_EIP))->prepend_orig_prefix()
-    );
+    //Hook into CGameMovement::CheckStuck
+    CHookTracker& htrack_CGameMovement_CheckStuck = anchors::server::CGameMovement::CheckStuck.hook_tracker(plugin.server_module());
+    plugin.register_patch<CFuncHook>(plugin.scratchpad(), htrack_CGameMovement_CheckStuck, (void*) &hook_CGameMovement_CheckStuck, -100000);
 
     //Detour the portal_use_player_avoidance cvar check in CPortal_Player::ShouldCollide
     SAnchor CPortal_Player_ShouldCollide = anchors::server::CPortal_Player::ShouldCollide.get(plugin.server_module());
@@ -47,15 +45,14 @@ enum {
     STUCK_HAD_PLAYER_COL_LAST = -6
 };
 
-void CPlayerStuckPatch::detour_CGameMovement_CheckStuck(void ***ptr_movement, int *ptr_retval, void **ptr_eip) {
-    void **movement = *ptr_movement;
+HOOK_FUNC int CPlayerStuckPatch::hook_CGameMovement_CheckStuck(HOOK_ORIG int (*orig)(void*), void **movement) {
     void *player = movement[1];
     int& m_StuckLast = *(int*) ((uint8_t*) player + OFF_CBasePlayer_m_StuckLast);
     // DevMsg("DETOUR CPlayerStuckPatch | CGameMovement::CheckStuck | this=%p player=%p m_StuckLast=%d\n", movement, player, m_StuckLast);
 
     //Check if we should intervene
     if(glob_sv->GetNumClients() - glob_sv->GetNumProxies() <= (should_apply_sp_compat_patches(*ptr_g_pGameRules, gpGlobals) ? 1 : 2)) {
-        return;
+        return orig(movement);
     }
 
     //Preserve the stuck status if the CPortal_Player::ShouldCollide detour tells us to
@@ -64,7 +61,7 @@ void CPlayerStuckPatch::detour_CGameMovement_CheckStuck(void ***ptr_movement, in
             Msg("P2MPPatch | Resetting inter-player collisions for CPortal_Player %p because player is no longer stuck\n", player);
             m_StuckLast = 0;
         }
-        return;
+        return orig(movement);
     }
 
     if(STUCK_WAIT_PLAYER_COL_FIRST < m_StuckLast && m_StuckLast <= STUCK_WAIT_PLAYER_COL_LAST) {
@@ -82,11 +79,10 @@ void CPlayerStuckPatch::detour_CGameMovement_CheckStuck(void ***ptr_movement, in
         } else m_StuckLast = STUCK_WAIT_PLAYER_COL_LAST;
     }
 
-    *ptr_retval = 0;
-    *ptr_eip = (uint8_t*) *ptr_eip + 0x1a5; //Jump forward to a return block
+    return 0;
 }
 
-void CPlayerStuckPatch::detour_CPortal_Player_ShouldCollide(void **ptr_player, void **ptr_playerAvoidanceCvar, int *ptr_collisionGroup, int *ptr_shouldIgnorePlayerCol) {
+DETOUR_FUNC void CPlayerStuckPatch::detour_CPortal_Player_ShouldCollide(void **ptr_player, void **ptr_playerAvoidanceCvar, int *ptr_collisionGroup, int *ptr_shouldIgnorePlayerCol) {
     void *player = *ptr_player;
     void *playerAvoidanceCvar = *ptr_playerAvoidanceCvar;
     int collisionGroup = *ptr_collisionGroup;

@@ -49,6 +49,26 @@ class IByteSequence {
         virtual uint8_t operator [](size_t off) const = 0;
 };
 
+class CByteSequenceWrapper : public IByteSequence {
+    public:
+        CByteSequenceWrapper(IByteSequence& wrapped_seq) : m_WrappedSeq(wrapped_seq) {}
+
+        virtual bool has_data() const override { return m_WrappedSeq.has_data(); }
+        virtual size_t size() const override { return m_WrappedSeq.size(); }
+        virtual const uint8_t *buffer() const override { return m_WrappedSeq.buffer(); }
+
+        virtual bool apply_anchor(SAnchor anchor) override { return m_WrappedSeq.apply_anchor(anchor); }
+
+        virtual int compare(const IByteSequence &seq, size_t this_off, size_t seq_off, size_t size) const override { return m_WrappedSeq.compare(seq, this_off, seq_off, size); }
+        virtual int compare(const uint8_t *buf, size_t off, size_t size) const override { return m_WrappedSeq.compare(buf, off, size); }
+
+        virtual void get_data(uint8_t *buf, size_t off, size_t size) const override { return m_WrappedSeq.get_data(buf, off, size); }
+        virtual uint8_t operator [](size_t off) const override { return m_WrappedSeq[off]; }
+
+    private:
+        IByteSequence& m_WrappedSeq;
+};
+
 class CSequentialByteSequence : public IByteSequence {
     public:
         CSequentialByteSequence() : m_Size(0) {}
@@ -58,11 +78,11 @@ class CSequentialByteSequence : public IByteSequence {
         CSequentialByteSequence(CSequentialByteSequence &seq) : m_Size(seq.m_Size) { m_Sequences = std::move(seq.m_Sequences); }
 
         inline void add_sequence(IByteSequence *ptr, bool owned=true) {
-            m_Sequences.push_back(seq_ent(m_Size, ptr, owned));
+            m_Sequences.push_back(SSeqEntry(m_Size, ptr, owned));
             m_Size += ptr->size();
         }
 
-        template<typename SeqType, typename... Args> inline SeqType& emplace_sequence(Args... args) {
+        template<typename SeqType, typename... Args> inline SeqType& emplace_sequence(Args&&... args) {
             SeqType *seq = new SeqType(args...);
             add_sequence(seq);
             return *seq;
@@ -77,37 +97,30 @@ class CSequentialByteSequence : public IByteSequence {
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const override;
 
         inline virtual uint8_t operator [](size_t off) const override {
-            const seq_ent& ent = get_sequence(off);
+            const SSeqEntry& ent = get_sequence(off);
             return (*ent.seq)[off - ent.off];
         }
 
     private:
-        struct seq_ent {
+        struct SSeqEntry {
             size_t off;
             IByteSequence *seq;
             bool owns_seq;
 
-            seq_ent() : off(0), seq(nullptr), owns_seq(false) {}
-            seq_ent(size_t off, IByteSequence *seq, bool owns_seq) : off(off), seq(seq), owns_seq(owns_seq) {}
-
-            seq_ent(seq_ent&& ent) {
-                off = ent.off;
-                seq = ent.seq;
-                owns_seq = ent.owns_seq;
-                ent.seq = nullptr;
-            }
-            seq_ent(const seq_ent& ent) = delete;
-
-            ~seq_ent() {
+            SSeqEntry() : off(0), seq(nullptr), owns_seq(false) {}
+            SSeqEntry(size_t off, IByteSequence *seq, bool owns_seq) : off(off), seq(seq), owns_seq(owns_seq) {}
+            SSeqEntry(SSeqEntry&& ent) : off(ent.off), seq(ent.seq), owns_seq(ent.owns_seq) { ent.owns_seq = false; }
+            SSeqEntry(const SSeqEntry& ent) = delete;
+            ~SSeqEntry() {
                 if(owns_seq) delete seq;
                 seq = nullptr;
             }
         };
 
-        const seq_ent& get_sequence(size_t off) const;
+        const SSeqEntry& get_sequence(size_t off) const;
 
         size_t m_Size;
-        std::vector<seq_ent> m_Sequences;
+        std::vector<SSeqEntry> m_Sequences;
 };
 
 class CIgnoreSequence : public IByteSequence {
@@ -255,6 +268,7 @@ class CRefInstructionSequence : public IByteSequence {
         SAnchor m_InstrAnchor;
 };
 
+#define SEQ_WRAP(seq) CByteSequenceWrapper(seq)
 #define SEQ_SEQ(...) CSequentialByteSequence({ __VA_ARGS__ })
 #define SEQ_IGN(len) CIgnoreSequence(len, val)
 #define SEQ_FILL(len, val) CFillSequence(len, val)

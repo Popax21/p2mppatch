@@ -2,7 +2,7 @@
 #include <vector>
 #include "detour.hpp"
 
-SAnchor CScratchDetour::update_scratch_seq(IByteSequence& seq) {
+SAnchor CScratchDetourSeq::update_scratch_seq(IByteSequence& seq) {
     //Allocate the sequence on the scratchpad
     m_ScratchPadEntry = m_ScratchPad.alloc_seq(seq);
 
@@ -40,7 +40,7 @@ bool CFuncDetour::apply_anchor(SAnchor anchor) {
     // - append user prefix sequences
     for(auto it = m_PrefixSeqs.rbegin(); it != m_PrefixSeqs.rend(); it++) {
         if(*it) scratch_seq.add_sequence(&**it, false);
-        else scratch_seq.add_sequence(new SEQ_BUF((const uint8_t*) anchor.get_addr(), size()));
+        else scratch_seq.emplace_sequence<CBufferSequence>((const uint8_t*) anchor.get_addr(), size());
     }
 
     std::vector<uint8_t> prefix_seq;
@@ -103,12 +103,12 @@ bool CFuncDetour::apply_anchor(SAnchor anchor) {
     if(!has_eip_arg) {
         for(std::unique_ptr<IByteSequence>& seq : m_SuffixSeqs) {
             if(seq) scratch_seq.add_sequence(&*seq, false);
-            else scratch_seq.add_sequence(new SEQ_BUF((const uint8_t*) anchor.get_addr(), size()));
+            else scratch_seq.emplace_sequence<CBufferSequence>((const uint8_t*) anchor.get_addr(), size());
         }
     } else if(m_SuffixSeqs.size() > 0) throw std::runtime_error("Can't have user suffix sequences when having EIP as a detour function argument");
 
     // - return back to the detoured code
-    if(has_eip_arg) scratch_seq.add_sequence(new SEQ_HEX("c3")); //ret
+    if(has_eip_arg) scratch_seq.emplace_sequence<CHexSequence>("c3"); //ret
     else scratch_seq.add_sequence(new SEQ_JMP(ret_addr));
 
     //Update the scratchpad sequence
@@ -116,5 +116,5 @@ bool CFuncDetour::apply_anchor(SAnchor anchor) {
     DevMsg("Prepared detour from %s to function at %p via scratchpad shim at %s\n", anchor.debug_str().c_str(), m_DetourFunc, scratch_anchor.debug_str().c_str());
 
     //Call the original anchoring code
-    return CScratchDetour::apply_anchor(anchor);
+    return CScratchDetourSeq::apply_anchor(anchor);
 }

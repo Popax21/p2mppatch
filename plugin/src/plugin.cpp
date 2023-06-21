@@ -36,7 +36,7 @@ void CMPPatchPlugin::update_patches() {
     }
 
     //Apply patches
-    Msg("Applying patches...\n");
+    Msg("Applying %zd patches...\n", m_Patches.size());
     for(std::unique_ptr<IPatch>& patch : m_Patches) patch->apply();
 
     //Invoke post-apply hooks

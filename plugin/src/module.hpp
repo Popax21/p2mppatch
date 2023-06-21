@@ -91,7 +91,7 @@ template<typename T> class IModuleFact : IModuleDependent {
     public:
         virtual const char *fact_name() const = 0;
 
-        T get(CModule& module) {
+        T const & get(CModule& module) {
             if(!m_Module) module.associate_dependent(this);
             if(m_Module == &module) return m_Value;
 

@@ -58,7 +58,7 @@ namespace patches::anchors {
 
         namespace CGameMovement {
             SMemberOffAnchor m_LastStuck("CGameMovement::m_LastStuck", CheckStuck, 0x126, "8b 88 ?? ?? ?? ??", 2);
-            SFuncAnchor CheckStuck("CGameMovement::CheckStuck", "8d 6c 24 30 83 ec 0c 8b 13 c6 83 6e 06 00 00 01 8d 7c 24 48 57", 0x1f);
+            SFuncAnchor CheckStuck("CGameMovement::CheckStuck", "8d 6c 24 30 83 ec 0c 8b 13 c6 83 6e 06 00 00 01 8d 7c 24 48 57", "55 57 56 53 81 ec 9c 00 00 00", 0x1f);
         }
 
         SFuncAnchor ServerClassInit_DT_BaseEntity("ServerClassInit<DT_BaseEntity>", "83 c4 1c 6a 20 6a 00 6a 01 6a 05 6a 04 68 c0 02 00 00", 0xb5);

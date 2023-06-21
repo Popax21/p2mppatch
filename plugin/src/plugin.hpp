@@ -26,9 +26,11 @@ class CMPPatchPlugin : public IServerPluginCallbacks {
         CModule& matchmaking_module() const { return *m_MatchMakingModule; }
         CModule& server_module() const { return *m_ServerModule; }
 
-        template<typename T, typename... Args> void register_patch(Args... args) {
-            m_Patches.emplace_back(new T(args...));
+        void register_patch(std::unique_ptr<IPatch> patch) {
+            patch->on_register(*this);
+            m_Patches.push_back(std::move(patch));
         }
+        template<typename T, typename... Args> void register_patch(Args&&... args) { register_patch(std::make_unique<T>(args...)); }
 
         //Server callbacks
         virtual bool Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory) override;

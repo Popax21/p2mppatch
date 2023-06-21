@@ -8,16 +8,16 @@
 #include "scratchpad.hpp"
 #include "patch.hpp"
 
-#define DETOUR_FUNC __attribute__((force_align_arg_pointer)) __attribute__((cdecl))
-
-class CScratchDetour : public IByteSequence {
+class CScratchDetourSeq : public IByteSequence {
     public:
         static const int MIN_SIZE = 5;
 
-        CScratchDetour(CScratchPad& scratch, int size, IByteSequence *scratch_seq) : CScratchDetour(scratch, size) {
+        CScratchDetourSeq(CScratchPad& scratch, int size, IByteSequence *scratch_seq) : CScratchDetourSeq(scratch, size) {
             m_ScratchSeq = std::unique_ptr<IByteSequence>(scratch_seq);
             DevMsg("Prepared detour scratchpad entry %s (%d bytes)\n", update_scratch_seq(*scratch_seq).debug_str().c_str(), size);
         }
+
+        const CScratchPad::SSeqEntry& scratch_entry() const { return m_ScratchPadEntry; }
 
         virtual bool has_data() const override {
             check_has_seq();
@@ -60,7 +60,7 @@ class CScratchDetour : public IByteSequence {
         }
 
     protected:
-        CScratchDetour(CScratchPad& scratch, int size) : m_ScratchPad(scratch), m_DetourSize(size), m_ScratchSeq(nullptr), m_DetourJumpSeq(nullptr) {
+        CScratchDetourSeq(CScratchPad& scratch, int size) : m_ScratchPad(scratch), m_DetourSize(size), m_ScratchSeq(nullptr), m_DetourJumpSeq(nullptr) {
             if(size < MIN_SIZE) throw std::runtime_error("Invalid detour patchsite size");
         }
 
@@ -79,7 +79,7 @@ class CScratchDetour : public IByteSequence {
         }
 };
 
-class CFuncDetour : public CScratchDetour {
+class CFuncDetour : public CScratchDetourSeq {
     public:
         struct SArgument {
             enum EType {
@@ -100,7 +100,7 @@ class CFuncDetour : public CScratchDetour {
             static inline SArgument stack_var(int esp_off) { return SArgument(EType::STACK_VAR, esp_off); };
         };
 
-        CFuncDetour(CScratchPad& scratch, int size, void *func, std::initializer_list<SArgument> args) : CScratchDetour(scratch, size), m_DetourFunc(func), m_DetourArgs(args) {}
+        CFuncDetour(CScratchPad& scratch, int size, void *func, std::initializer_list<SArgument> args) : CScratchDetourSeq(scratch, size), m_DetourFunc(func), m_DetourArgs(args) {}
 
         CFuncDetour *prepend_orig_prefix() {
             m_PrefixSeqs.push_back(std::unique_ptr<IByteSequence>(nullptr));
@@ -138,6 +138,8 @@ class CFuncDetour : public CScratchDetour {
         std::vector<std::unique_ptr<IByteSequence>> m_PrefixSeqs, m_SuffixSeqs;
 };
 
+#define DETOUR_FUNC __attribute__((force_align_arg_pointer)) __attribute__((cdecl))
+
 #define DETOUR_ARG_EAX CFuncDetour::SArgument::reg_eax
 #define DETOUR_ARG_EBX CFuncDetour::SArgument::reg_ebx
 #define DETOUR_ARG_ECX CFuncDetour::SArgument::reg_ecx
@@ -148,6 +150,7 @@ class CFuncDetour : public CScratchDetour {
 #define DETOUR_ARG_LOCAL(ebp_off) CFuncDetour::SArgument::local_var(ebp_off)
 #define DETOUR_ARG_STACK(esp_off) CFuncDetour::SArgument::stack_var(esp_off)
 
+#define SEQ_SCRATCH_DETOUR(plugin, size, seq) CScratchDetourSeq(plugin.scratchpad(), size, seq)
 #define SEQ_FUNC_DETOUR(plugin, size, func, ...) CFuncDetour(plugin.scratchpad(), size, (void*) func, { __VA_ARGS__ })
 
 #endif

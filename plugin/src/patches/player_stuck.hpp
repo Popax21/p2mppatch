@@ -21,8 +21,8 @@ namespace patches {
             static void **ptr_g_pGameRules;
             static IServer *glob_sv;
 
-            static void detour_CGameMovement_CheckStuck(void ***ptr_movement, int *ptr_retval, void **ptr_eip);
-            static void detour_CPortal_Player_ShouldCollide(void **ptr_player, void **ptr_playerAvoidanceCvar, int *ptr_collisionGroup, int *ptr_shouldIgnorePlayerCol);
+            HOOK_FUNC static int hook_CGameMovement_CheckStuck(HOOK_ORIG int (*orig)(void*), void **movement);
+            DETOUR_FUNC static void detour_CPortal_Player_ShouldCollide(void **ptr_player, void **ptr_playerAvoidanceCvar, int *ptr_collisionGroup, int *ptr_shouldIgnorePlayerCol);
     };
 }
 
