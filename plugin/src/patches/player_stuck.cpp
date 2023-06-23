@@ -69,7 +69,8 @@ HOOK_FUNC int CPlayerStuckPatch::hook_CGameMovement_CheckStuck(HOOK_ORIG int (*o
         //Advance to the next wait phase
         if(m_StuckLast < STUCK_HAD_PLAYER_COL_LAST) {
             if(m_StuckLast == STUCK_HAD_PLAYER_COL_FIRST) Msg("P2MPPatch | Ignoring inter-player collisions for CPortal_Player %p because player is stuck\n", player);
-            m_StuckLast = STUCK_WAIT_PLAYER_COL_FIRST + (m_StuckLast - STUCK_HAD_PLAYER_COL_FIRST) + 1;
+            m_StuckLast = STUCK_WAIT_PLAYER_COL_FIRST + (m_StuckLast - STUCK_HAD_PLAYER_COL_FIRST);
+            m_StuckLast += std::min(STUCK_WAIT_PLAYER_COL_LAST - m_StuckLast, 2); //Increment by more than we decrement
             DevMsg("CPlayerStuckPatch | Incremented CPortal_Player %p stuck state to %d\n", player, m_StuckLast);
         } else m_StuckLast = STUCK_WAIT_PLAYER_COL_LAST;
     }

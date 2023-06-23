@@ -101,14 +101,19 @@ DETOUR_FUNC void CPlayerSpawnPatch::detour_CPointTeleport_DoTeleport(void **ptr_
     }
 
     //Teleport all players
-    int num_tped_players = 0;
-    for(int i = 1; i <= gpGlobals->maxClients; i++) {
-        void *player = UTIL_PlayerByIndex(i);
-        if(!player) continue;
+    if(CTransitionsFixPatch::is_everyone_ready(*ptr_g_pGameRules)) {
+        int num_tped_players = 0;
+        for(int i = 1; i <= gpGlobals->maxClients; i++) {
+            void *player = UTIL_PlayerByIndex(i);
+            if(!player) continue;
 
-        CPointTeleport_DoTeleport(teleport, nullptr, vecOrigin, angRotation, (uintptr_t) player);
-        num_tped_players++;
+            CPointTeleport_DoTeleport(teleport, nullptr, vecOrigin, angRotation, (uintptr_t) player);
+            num_tped_players++;
+        }
+
+        Msg("P2MPPatch | Teleported %d players for CPointTeleport %p with target '!player'\n", num_tped_players, teleport);
+    } else {
+        //Don't teleport players as not everyone is ready yet
+        Msg("P2MPPatch | Skipped teleporting players for CPointTeleport %p targeting '!player' as not everyone is ready yet\n", teleport);
     }
-
-    Msg("P2MPPatch | Teleported %d players for CPointTeleport %p with target '!player'\n", num_tped_players, teleport);
 }
