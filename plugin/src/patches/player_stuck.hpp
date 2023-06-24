@@ -12,6 +12,8 @@ class CMPPatchPlugin;
 namespace patches {
     class CPlayerStuckPatch : public IPatchRegistrar {
         public:
+            static const int NUM_NO_PLAYER_COL_FRAMES = 8;
+
             virtual const char *name() const override { return "player_stuck"; }
 
             virtual void register_patches(CMPPatchPlugin& plugin) override;
