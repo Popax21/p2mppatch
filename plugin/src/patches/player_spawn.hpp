@@ -18,7 +18,7 @@ namespace patches {
             virtual void register_patches(CMPPatchPlugin& plugin) override;
 
         private:
-            static int OFF_CBaseEntity_m_CollisionGroup;
+            static int OFF_CBaseEntity_m_MoveType, OFF_CBaseEntity_m_CollisionGroup;
 
             static void *engine_trace;
             static CGlobalVars *gpGlobals;

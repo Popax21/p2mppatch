@@ -12,6 +12,7 @@
 
 using namespace patches;
 
+int CPlayerSpawnPatch::OFF_CBaseEntity_m_MoveType;
 int CPlayerSpawnPatch::OFF_CBaseEntity_m_CollisionGroup;
 
 void *CPlayerSpawnPatch::engine_trace;
@@ -26,6 +27,7 @@ void CPlayerSpawnPatch::register_patches(CMPPatchPlugin& plugin) {
     SAnchor CPointTeleport_DoTeleport = anchors::server::CPointTeleport::DoTeleport.get(plugin.server_module());
 
     //Obtain needed misc information for the detour
+    OFF_CBaseEntity_m_MoveType = anchors::server::CBaseEntity::m_MoveType.get(plugin.server_module());
     OFF_CBaseEntity_m_CollisionGroup = anchors::server::CBaseEntity::m_CollisionGroup.get(plugin.server_module());
 
     engine_trace = plugin.engine_trace();
@@ -52,16 +54,21 @@ void CPlayerSpawnPatch::register_patches(CMPPatchPlugin& plugin) {
 
 class CSpawnGroundTraceFilter : public CTraceFilter {
     public:
-        CSpawnGroundTraceFilter(int off) : OFF_CBaseEntity_m_CollisionGroup(off) {}
+        CSpawnGroundTraceFilter(int movetype_off, int colgroup_off) : OFF_CBaseEntity_m_MoveType(movetype_off), OFF_CBaseEntity_m_CollisionGroup(colgroup_off) {}
 
 	    virtual bool ShouldHitEntity(IHandleEntity *pEntity, int contentsMask) override {
             void *ent = ((IServerUnknown*) pEntity)->GetBaseEntity();
+
+            //Only collide with moving entities
+            if(*(unsigned char*) ((uint8_t*) ent + OFF_CBaseEntity_m_MoveType) == MOVETYPE_NONE) return false;
+
+            //Only collide with "world entities" (so e.g. no players, clutter, decorations, ...)
             int col_group = *(int*) ((uint8_t*) ent + OFF_CBaseEntity_m_CollisionGroup);
-            return col_group == COLLISION_GROUP_NONE; //Only collide with "world entities" (so e.g. no players, clutter, decorations, ...)
+            return col_group == COLLISION_GROUP_NONE;
         }
 
     private:
-        int OFF_CBaseEntity_m_CollisionGroup;
+        int OFF_CBaseEntity_m_MoveType, OFF_CBaseEntity_m_CollisionGroup;
 };
 
 DETOUR_FUNC void CPlayerSpawnPatch::detour_CPointTeleport_DoTeleport(void **ptr_teleport, const char **ptr_entName, Vector **ptr_vecOrigin, QAngle **ptr_angRotation) {
@@ -80,19 +87,38 @@ DETOUR_FUNC void CPlayerSpawnPatch::detour_CPointTeleport_DoTeleport(void **ptr_
     //Update the spawnpoint
     void *spawn = *ptr_g_pLastSpawn;
     if(spawn) {
-        //Teleport the spawnpoint
-        PATCH_VTAB_FUNC(spawn, server::CBaseEntity::SetParent)(spawn, nullptr, -1);
-        CPointTeleport_DoTeleport(teleport, nullptr, vecOrigin, angRotation, (uintptr_t) spawn);
-
-        //Shoot a raycast down to find the ground entity
         Ray_t ray;
         trace_t trace;
-        CSpawnGroundTraceFilter filter(OFF_CBaseEntity_m_CollisionGroup);
-        ray.Init(*vecOrigin, Vector(vecOrigin->x, vecOrigin->y - 8192, vecOrigin->z));
+        CSpawnGroundTraceFilter filter(OFF_CBaseEntity_m_MoveType, OFF_CBaseEntity_m_CollisionGroup);
+
+        //Try to ensure that there's a 50 unit margin around the respawn point
+        //Also apply a baseline 16 units up offset to ensure we don't have weird interactions with the ground
+        Vector spawn_off(0, 0, 16);
+        static Vector SPAWN_MARGIN_DIRS[] = { Vector(-1, 0, 0), Vector(+1, 0, 0), Vector(0, -1, 0), Vector(0, +1, 0) };
+        for(int i = 0; i < 4; i++) {
+            ray.Init(*vecOrigin + Vector(0, 0, 16), *vecOrigin + Vector(0, 0, 16) + SPAWN_MARGIN_DIRS[i] * 50);
+            PATCH_VTAB_FUNC(engine_trace, engine::IEngineTrace::TraceRay)(engine_trace, ray, MASK_PLAYERSOLID, &filter, &trace);
+            if(!trace.DidHit()) continue;
+
+            Vector dir_off = trace.endpos - *vecOrigin;
+            dir_off -= SPAWN_MARGIN_DIRS[i] * 50;
+            if(dir_off.x != 0) spawn_off.x = (spawn_off.x != 0 ? (spawn_off.x + dir_off.x) / 2 : dir_off.x);
+            if(dir_off.y != 0) spawn_off.y = (spawn_off.y != 0 ? (spawn_off.y + dir_off.y) / 2 : dir_off.y);
+            if(dir_off.z != 0) spawn_off.z = (spawn_off.z != 0 ? (spawn_off.z + dir_off.z) / 2 : dir_off.z);
+        }
+        DevMsg("CPlayerSpawnPatch | spawnpoint margin offset: x=%f y=%f z=%f\n", spawn_off.x, spawn_off.y, spawn_off.z);
+
+        //Teleport the spawnpoint
+        Vector spawn_origin = *vecOrigin + spawn_off;
+        PATCH_VTAB_FUNC(spawn, server::CBaseEntity::SetParent)(spawn, nullptr, -1);
+        CPointTeleport_DoTeleport(teleport, nullptr, &spawn_origin, angRotation, (uintptr_t) spawn);
+
+        //Shoot a raycast down to find the ground entity
+        ray.Init(spawn_origin, spawn_origin + Vector(0, 0, -8192));
         PATCH_VTAB_FUNC(engine_trace, engine::IEngineTrace::TraceRay)(engine_trace, ray, MASK_PLAYERSOLID, &filter, &trace);
         DevMsg("CPlayerSpawnPatch | spawnpoint ground TraceRay: DidHit=%d fraction=%f m_pEnt=%p allsolid=%d startsolid=%d\n", trace.DidHit(), trace.fraction, trace.m_pEnt, trace.allsolid, trace.startsolid);
 
-        //Anchor the the ground entity
+        //Anchor to the ground entity
         void *ground_ent = trace.DidHit() ? trace.m_pEnt : nullptr;
         PATCH_VTAB_FUNC(spawn, server::CBaseEntity::SetParent)(spawn, ground_ent, -1);
 

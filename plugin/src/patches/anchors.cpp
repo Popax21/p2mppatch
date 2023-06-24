@@ -68,11 +68,16 @@ namespace patches::anchors {
             SMemberOffAnchor m_CollisionGroup("CBaseEntity::m_CollisionGroup", SetCollisionGroup, 0xf, "39 b3 ?? ?? ?? ??", 2);
             SFuncAnchor SetMoveType("CBaseEntity::SetMoveType", "55 57 56 53 83 ec 2c 8b 5c 24 40 8b 7c 24 44 8b 74 24 48 0f b6 8b e2 00 00 00 39 f9");
             SFuncAnchor SetCollisionGroup("CBaseEntity::SetCollisionGroup", "55 57 56 53 83 ec 1c 8b 5c 24 30 8b 74 24 34 39 b3 50 01 00 00");
+            SFuncAnchor CollisionRulesChanged("CBaseEntity::CollisionRulesChanged", "8b 03 83 ec 04 68 00 04 00 00 8d 7c 24 08 57 53", 0x14);
 
             SFuncAnchor ThinkSet("CBaseEntity::ThinkSet", "55 57 56 53 83 ec 1c 8b 74 24 44 f3 0f 7e 44 24 38");
             SFuncAnchor SetNextThink("CBaseEntity::SetNextThink", "f3 0f 10 44 24 34 8b 6c 24 30 0f 2e c1 8b 74 24 38", 0x7);
 
             SFuncAnchor GetGroundEntity("CBaseEntity::GetGroundEntity", "8b 80 60 01 00 00 83 f8 ff 74 1b 0f b7 d0 c1 e8 10 8d 14 52 8d 0c d1", 0xa);
+        }
+
+        namespace CCollisionEvent {
+            SFuncAnchor ShouldCollide("CBaseEntity::ShouldCollide", "55 89 e5 57 56 53 83 ec 2c 8b 5d 08 8b 4d 14 8b 7d 0c", "55 89 e5 57 56");
         }
 
         SGlobVarAnchor g_pLastSpawn("g_pLastSpawn", CPortal_Player::EntSelectSpawnPoint, 0x47, "8b 1d ?? ?? ?? ??", 2);

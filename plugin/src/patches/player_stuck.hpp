@@ -19,13 +19,16 @@ namespace patches {
             virtual void register_patches(CMPPatchPlugin& plugin) override;
 
         private:
-            static int OFF_CBaseEntity_m_MoveType, OFF_CBasePlayer_m_StuckLast;
+            static int OFF_CBasePlayer_m_StuckLast;
 
             static CGlobalVars *gpGlobals;
             static void **ptr_g_pGameRules;
             static IServer *glob_sv;
 
+            static void __attribute__((regparm(1))) (*CBaseEntity_CollisionRulesChanged)(void *entity);
+
             HOOK_FUNC static int hook_CGameMovement_CheckStuck(HOOK_ORIG int (*orig)(void*), void **movement);
+            HOOK_FUNC static int hook_CCollisionEvent_ShouldCollide(HOOK_ORIG bool (*orig)(void*, void*, void*, void*, void*), void *col_event, void *pObj0, void *pObj1, void *pGameData0, void *pGameData1);
             HOOK_FUNC static bool hook_CPortal_Player_ShouldCollide(HOOK_ORIG bool (*orig)(void*, int, int), void *player, int collisionGroup, int contentsMask);
     };
 }

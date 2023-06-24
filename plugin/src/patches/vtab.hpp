@@ -27,7 +27,8 @@ namespace patches::vtabs {
         }
 
         namespace CBaseEntity {
-            PATCH_DECL_VTAB_FUNC_ARGS(SetParent, 39, void, void *pNewParent, int iAttachment);   
+            PATCH_DECL_VTAB_FUNC_ARGS(SetParent, 39, void, void *pNewParent, int iAttachment);
+            PATCH_DECL_VTAB_FUNC(IsPlayer, 86, bool);
         }
     }
 

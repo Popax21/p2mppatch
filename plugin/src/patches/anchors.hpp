@@ -153,11 +153,16 @@ namespace patches::anchors {
             extern SMemberOffAnchor m_CollisionGroup;
             extern SFuncAnchor SetMoveType;
             extern SFuncAnchor SetCollisionGroup;
+            extern SFuncAnchor CollisionRulesChanged;
 
             extern SFuncAnchor ThinkSet;
             extern SFuncAnchor SetNextThink;
 
             extern SFuncAnchor GetGroundEntity;
+        }
+
+        namespace CCollisionEvent {
+            extern SFuncAnchor ShouldCollide;
         }
 
         extern SGlobVarAnchor g_pLastSpawn;
