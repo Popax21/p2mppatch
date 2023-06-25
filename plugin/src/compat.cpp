@@ -1,3 +1,4 @@
+#define _POSIX_THREAD_SAFE_FUNCTIONS
 #include <time.h>
 #include <math.h>
 
