@@ -1,4 +1,3 @@
-#include <vector>
 #include <tier0/dbg.h>
 #include <tier0/platform.h>
 #include <tier1/tier1.h>
@@ -6,6 +5,7 @@
 #include <eiface.h>
 #include <tier0/valve_minmax_off.h>
 
+#include <vector>
 #include "plugin.hpp"
 #include "module.hpp"
 #include "patch.hpp"
