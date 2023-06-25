@@ -1,0 +1,26 @@
+name: Plugin Build / Linux
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Runtime
+      run: ./setup_runtime.sh
+
+    - name: Build SDK
+      run: ./build_sdk.sh
+
+    - name: Make Plugin
+      run: cd plugin && make
+
+    - name: Upload Plugin SO
+      uses: actions/upload-artifact@v3.1.2
+      with:
+        name: p2mppatch.so
+        path: plugin/p2mppatch.so
