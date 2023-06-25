@@ -17,7 +17,7 @@ SDKSTATLIB := $(addprefix $(SDK)/mp/src/lib/public/linux32/, $(SDKSTATLIB))
 ifeq ($(OS), Windows_NT)
 	# Don't tell it that this is GCC on Windows, otherwise the platform will complain
 	# Fake being MSVC instead
-	OSFLAGS := -DWIN32 -D_WIN32 -D_MSC_VER -D_MSC_FULL_VER=180030723 -Isystem compat_inv
+	OSFLAGS := -DWIN32 -D_WIN32 -D_MSC_VER -D_MSC_FULL_VER=180030723 -Isystem compat_inc
 else
 	OSFLAGS := -DPOSIX -D_POSIX -DLINUX -D_LINUX -DGNUC -DCOMPILER_GCC 
 endif
