@@ -1,0 +1,36 @@
+name: Plugin Build / Linux
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+    
+    - name: Cache Runtime
+      id: cache-runtime
+      uses: actions/cache@v1.2.1
+      with:
+        path: runtime/
+        key: ${{ runner.os }}-runtime-${{ hashFiles('./setup_runtime.sh') }}
+
+    - if: ${{ steps.cache-runtime.cache-hit != 'true' }}
+      name: Setup Runtime
+      run: ./setup_runtime.sh
+
+    - name: Build SDK
+      run: ./build_sdk.sh
+
+    - name: Make Plugin
+      run: cd plugin && make
+
+    - name: Upload Plugin SO
+      uses: actions/upload-artifact@v3.1.2
+      with:
+        name: p2mppatch.so
+        path: plugin/p2mppatch.so
