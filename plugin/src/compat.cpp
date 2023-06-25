@@ -20,8 +20,8 @@ struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
 #ifdef LINUX
     return localtime_r(timep, result);
 #else
-    assert(localtime_s(result, timep) == 0);
-    return result;
+	*result = *localtime(timep);
+	return result;
 #endif
 }
 
