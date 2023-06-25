@@ -2,9 +2,10 @@ name: Plugin Build / Linux
 
 on:
   push:
-    branches: [ "main" ]
     tags:
       - 'v*'
+
+permissions: write-all
 
 jobs:
   build:
@@ -23,7 +24,7 @@ jobs:
         path: runtime/
         key: ${{ runner.os }}-runtime-${{ hashFiles('./setup_runtime.sh') }}
 
-    - if: ${{ steps.cache_runtime.cache-hit != 'true' }}
+    - if: ${{ steps.cache_runtime.outputs.cache-hit != 'true' }}
       name: Setup Runtime
       run: ./setup_runtime.sh
 
