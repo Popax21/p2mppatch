@@ -9,8 +9,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+    
+    - name: Cache Runtime
+      id: cache-runtime
+      uses: actions/cache@v1.2.1
+      with:
+        path: runtime/
+        key: ${{ runner.os }}-runtime-${{ hashFiles('./setup_runtime.sh') }}
 
-    - name: Setup Runtime
+    - if: ${{ steps.cache-runtime.cache-hit != 'true' }}
+      name: Setup Runtime
       run: ./setup_runtime.sh
 
     - name: Build SDK
