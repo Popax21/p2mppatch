@@ -3,6 +3,8 @@ name: Plugin Build / Linux
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -15,13 +17,13 @@ jobs:
       run: sudo apt-get install build-essential libc6-dev-i386 gcc-multilib g++-multilib
 
     - name: Cache Runtime
-      id: cache-runtime
+      id: cache_runtime
       uses: actions/cache@v1.2.1
       with:
         path: runtime/
         key: ${{ runner.os }}-runtime-${{ hashFiles('./setup_runtime.sh') }}
 
-    - if: ${{ steps.cache-runtime.cache-hit != 'true' }}
+    - if: ${{ steps.cache-cache_runtime.cache-hit != 'true' }}
       name: Setup Runtime
       run: ./setup_runtime.sh
 
@@ -31,8 +33,24 @@ jobs:
     - name: Make Plugin
       run: cd plugin && make
 
-    - name: Upload Plugin SO
-      uses: actions/upload-artifact@v3.1.2
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: p2mppatch.so
-        path: plugin/p2mppatch.so
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release SO
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: plugin/p2mppatch.so
+        asset_name: p2mppatch.so
+        asset_content_type: application/x-sharedlib

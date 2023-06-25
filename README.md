@@ -28,6 +28,9 @@ Patches include:
 - `env_fade` entities will never affect all players in single player maps
 
 ## Building
+Alternatively, you can grab the latest release from [here](https://github.com/Popax21/p2mppatch/releases). Just place the `p2mppatch.so` file in the `portal2` game directory if you do.
+
+If you want to build from source, follow these steps:
 - ensure you have cloned the repository recursively - if not, execute `git
   submodule init` and `git submodule update`
 - download and setup the Steam runtime using the `./setup_runtime.sh` script
