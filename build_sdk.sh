@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/bash -e
 export STEAM_RUNTIME_PATH="$PWD/runtime"
 cd sdk/mp/src/
 ./createallprojects
