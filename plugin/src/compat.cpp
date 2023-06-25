@@ -17,7 +17,11 @@ double __pow_finite(double a, double b) {
 }
 
 struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
+#ifdef LINUX
     return localtime_r(timep, result);
+#else
+    return localtime(timep, result);
+#endif
 }
 
 long ThreadInterlockedIncrement(long volatile *p) {
