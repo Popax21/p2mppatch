@@ -16,7 +16,7 @@ struct check_mod_params {
     const char *name;
     void *base_addr;
     size_t size;
-    uint8_t *page_flags;
+    std::unique_ptr<uint8_t[]> page_flags;
 };
 
 static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
@@ -42,8 +42,8 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
 
     //Create page flags
     size_t num_pages = (end_addr - start_addr) / PAGE_SIZE;
-    params->page_flags = new uint8_t[num_pages];
-    std::fill_n(params->page_flags, num_pages, 0);
+    params->page_flags = std::make_unique<uint8_t[]>(num_pages);
+    std::fill_n(&params->page_flags[0], num_pages, 0);
 
     for(int i = 0; i < info->dlpi_phnum; i++) {
         Elf32_Word pflags = info->dlpi_phdr[i].p_flags;
@@ -63,7 +63,7 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
     return 0;
 }
 
-static bool find_module(const char *name, void **base_addr, size_t *size, uint8_t **page_flags) {
+static bool find_module(const char *name, void*& base_addr, size_t& size, std::unique_ptr<uint8_t[]>& page_flags) {
     struct check_mod_params params;
     params.name = name;
     params.base_addr = nullptr;
@@ -73,9 +73,9 @@ static bool find_module(const char *name, void **base_addr, size_t *size, uint8_
     dl_iterate_phdr(check_mod, &params);
     if(!params.base_addr) return false;
 
-    *base_addr = params.base_addr;
-    *size = params.size;
-    *page_flags = params.page_flags;
+    base_addr = params.base_addr;
+    size = params.size;
+    page_flags = std::move(params.page_flags);
     return true;
 }
 
@@ -84,18 +84,82 @@ static void apply_page_flags(void *page, uint8_t flags) {
     if(flags & (int) CModule::EPageFlag::PAGE_R) prot |= PROT_READ;
     if(flags & (int) CModule::EPageFlag::PAGE_W) prot |= PROT_WRITE;
     if(flags & (int) CModule::EPageFlag::PAGE_X) prot |= PROT_EXEC;
-    if(mprotect(page, PAGE_SIZE, prot) < 0) {
-        throw std::system_error(errno, std::system_category());
-    }
+    if(mprotect(page, PAGE_SIZE, prot) < 0) throw std::system_error(errno, std::system_category());
 }
 
 #else
-#error Implement me!
+#include <winnt.h>
+#include <errhandlingapi.h>
+#include <psapi.h>
+#include <processthreadsapi.h>
+#include <memoryapi.h>
+#include <libloaderapi.h>
+
+static bool find_module(const char *name, void*& base_addr, size_t& size, std::unique_ptr<uint8_t>& page_flags) {
+    //Get the module handle
+    HMODULE mod = GetModuleHandleA(name);
+    if(!mod) return false;
+
+    //Get module info
+    MODULEINFO mod_info;
+    if(!GetModuleInformation(GetCurrentProcess(), mod, &mod_info, sizeof(mod_info))) throw std::system_error(GetLastError(), std::system_category());
+    base_addr = (void*) mod_info.lpBaseOfDll;
+    size = (size_t) mod_info.SizeOfImage;
+
+    //Create page flags
+    size_t num_pages = (mod_info.SizeOfImage + PAGE_SIZE - 1) / PAGE_SIZE;
+    page_flags = std::make_unique<uint8_t[]>(num_pages);
+    std::fill_n(&params->page_flags[0], num_pages, 0);
+
+    MEMORY_BASIC_INFORMATION mem_info;
+    for(int i = 0; i < num_pages; i++) {
+        //Query memory information
+        if(VirtualQuery((uint8_t*) base_addr + i * PAGE_SIZE, &mem_info, sizeof(mem_info)) < sizeof(mem_info)) throw std::system_error(GetLastError(), std::system_category());
+
+        //Set flags
+        int flags;
+        switch(mem_info.Protect & 0xff) {
+            case PAGE_NOACCESS:             flags = 0; break;
+            case PAGE_READONLY:             flags = (int) CModule::EPageFlag::PAGE_R; break;
+            case PAGE_READWRITE:
+            case PAGE_WRITECOPY:            flags = (int) CModule::EPageFlag::PAGE_R | (int) CModule::EPageFlag::PAGE_W; break;
+            case PAGE_EXECUTE_READ:         flags = (int) CModule::EPageFlag::PAGE_R | (int) CModule::EPageFlag::PAGE_X; break;
+            case PAGE_EXECUTE_READWRITE:
+            case PAGE_EXECUTE_WRITECOPY:    flags = (int) CModule::EPageFlag::PAGE_R | (int) CModule::EPageFlag::PAGE_W | (int) CModule::EPageFlag::PAGE_X; break;
+            default:
+                std::stringstream sstream;
+                sstream << "Unknown Win32 memory protection value " << mem_info.Protect;
+                throw std::runtime_error(sstream.str());
+        }
+        page_flags[i] = (uint8_t) flags; 
+    }
+
+    return true;
+}
+
+static void apply_page_flags(void *page, uint8_t flags) {
+    int prot = 0;
+    if(!(flags & (int) CModule::EPageFlag::PAGE_R))
+        if(flags != 0) throw std::invalid_argument("Can't have non-readable pages on Windows");
+        prot = PAGE_NOACCESS;
+    } else {
+        if(flags & (int) CModule::EPageFlag::PAGE_X) {
+            if(flags & (int) CModule::EPageFlag::PAGE_W) prot = PAGE_EXECUTE_READWRITE;
+            else prot = PAGE_EXECUTE_READ;
+        } else {
+            if(flags & (int) CModule::EPageFlag::PAGE_W) prot = PAGE_READWRITE;
+            else prot = PAGE_READONLY;
+        }
+    }
+
+    if(!VirtualProtect(page, PAGE_SIZE, ptr, nullptr)) throw std::system_error(GetLastError(), std::system_category());
+}
+
 #endif
 
 CModule::CModule(const char *name) : m_Name(name) {
     //Find the module
-    if(!find_module(name, &m_BaseAddr, &m_Size, &m_PageFlags)) {
+    if(!find_module(name, m_BaseAddr, m_Size, m_PageFlags)) {
         std::stringstream sstream;
         sstream << "Can't find module '" << name << "'";
         throw std::runtime_error(sstream.str());

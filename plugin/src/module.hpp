@@ -4,6 +4,7 @@
 #include <tier0/dbg.h>
 #include <tier0/valve_minmax_off.h>
 
+#include <memory>
 #include <sstream>
 #include <stdexcept>
 #include "byteseq.hpp"
@@ -81,7 +82,7 @@ class CModule : public IByteSequence {
         void *m_BaseAddr;
         size_t m_Size;
 
-        uint8_t *m_PageFlags;
+        std::unique_ptr<uint8_t[]> m_PageFlags;
         CSuffixArray *m_SufArray;
 
         std::vector<IModuleDependent*> m_Dependents;

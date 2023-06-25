@@ -18,7 +18,18 @@ static inline void free_page(void *page) {
 }
 
 #else
-#error Implement me!
+#include <errhandlingapi.h>
+#include <memoryapi.h>
+
+static inline void *alloc_page() {
+    void *page = VirtualAlloc(nullptr, CScratchPad::SCRATCH_PAGE_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    if(!page) throw std::system_error(GetLastError(), std::system_category());
+    return page;
+}
+
+static inline void free_page(void *page) {
+    if(!VirtualFree(page, 0, MEM_RELEASE)) throw std::system_error(GetLastError(), std::system_category());
+}
 #endif
 
 CScratchPad::CScratchPad() : m_TotalSize(0) {
