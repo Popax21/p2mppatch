@@ -20,7 +20,7 @@ void CEnvFadePatch::register_patches(CMPPatchPlugin& plugin) {
     ptr_g_pGameRules = (void**) anchors::server::g_pGameRules.get(plugin.server_module()).get_addr();
 
     SAnchor CEnvFade_InputFade = anchors::server::CEnvFade::InputFade.get(plugin.server_module());
-    plugin.register_patch<CSeqPatch>(CEnvFade_InputFade + 0x2c, new SEQ_HEX("18 08 0f 45 da"),
+    plugin.register_patch<CSeqPatch>(CEnvFade_InputFade + 0x2c, new SEQ_HEX("a8 08 0f 45 da"),
         (new SEQ_FUNC_DETOUR(plugin, 5, DETOUR_CEnvFade_InputFade_InputReverseFade, DETOUR_ARG_EDI, DETOUR_ARG_EAX))->prepend_orig_prefix()
     );
 
