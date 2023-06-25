@@ -17,7 +17,14 @@ SDKSTATLIB := $(addprefix $(SDK)/mp/src/lib/public/linux32/, $(SDKSTATLIB))
 # OPTFLAGS ?= -O0 -g3
 # OPTFLAGS ?= -O0 -g3 -fsanitize=address
 OPTFLAGS ?= -O3 -g3
-CPPFLAGS := $(OPTFLAGS) -m32 -std=gnu++17 -march=core2 -mtune=core2 -msse2 -mfpmath=sse -fpermissive -DNO_HOOK_MALLOC -DNO_MALLOC_OVERRIDE -DGNUC -DCOMPILER_GCC -DPOSIX -D_POSIX -DLINUX -D_LINUX -DDLLNAME=p2mppatch
+
+ifeq ($(OS), Windows_NT)
+	OSFLAGS := -DWIN32 -D_WIN32
+else
+	OSFLAGS := -DPOSIX -D_POSIX -DLINUX -D_LINUX 
+endif
+
+CPPFLAGS := $(OPTFLAGS) -m32 -std=gnu++17 -march=core2 -mtune=core2 -msse2 -mfpmath=sse -fpermissive -DNO_HOOK_MALLOC -DNO_MALLOC_OVERRIDE -DGNUC -DCOMPILER_GCC -DDLLNAME=p2mppatch
 CFLAGS := $(CPPFLAGS) -I"src" -I"$(SDK)/mp/src/public" -I"$(SDK)/mp/src/public/tier0" -I"$(SDK)/mp/src/public/tier1" -I"$(COMPILER)/include/c++/4.6.3"
 LFLAGS := $(CPPFLAGS) -shared -Wl,--no-undefined -L"$(SDK)/mp/src/lib/public/linux32" -u _CreateInterface -lm -ldl -lpthread
 
