@@ -15,8 +15,14 @@
 namespace patches::anchors {
     struct SFuncAnchor : public IModuleFact<SAnchor> {
         public:
-            SFuncAnchor(const char *name, const char *hex_seq, int off = 0) : m_Name(name), m_Sequence(hex_seq), m_Offset(off) {}
-            SFuncAnchor(const char *name, const char *hex_seq, const char *begin_hex_seq, int off = 0) : SFuncAnchor(name, hex_seq, off) {
+            SFuncAnchor(const char *name, const char *hex_seq, int off = 0, const char *discrim_seq = nullptr, int discrim_off = 0) : m_Name(name), m_Sequence(hex_seq), m_Offset(off) {
+                if(discrim_seq) {
+                    m_DiscrimSequence = std::make_unique<CMaskedHexSequence>(discrim_seq);
+                    m_DiscrimOff = discrim_off;
+                }
+            }
+
+            SFuncAnchor(const char *name, const char *hex_seq, const char *begin_hex_seq, int off = 0, const char *discrim_seq = nullptr, int discrim_off = 0) : SFuncAnchor(name, hex_seq, off, discrim_seq, discrim_off) {
                 m_FuncBeginSequence = std::make_unique<CMaskedHexSequence>(begin_hex_seq);
                 m_HookTrackerFact = std::make_unique<CHookTrackerFact>(*this, *m_FuncBeginSequence);
             }
@@ -37,13 +43,15 @@ namespace patches::anchors {
             const char *m_Name;
             CHexSequence m_Sequence;
             int m_Offset;
+            std::unique_ptr<CMaskedHexSequence> m_DiscrimSequence;
+            int m_DiscrimOff;
 
             std::unique_ptr<CMaskedHexSequence> m_FuncBeginSequence;
             std::unique_ptr<CHookTrackerFact> m_HookTrackerFact;
 
             virtual SAnchor determine_value(CModule& module) override {
                 try {
-                    SAnchor anchor = module.find_seq_anchor(m_Sequence) - m_Offset;
+                    SAnchor anchor = module.find_seq_anchor(m_Sequence, m_DiscrimSequence ? &*m_DiscrimSequence : nullptr, m_DiscrimOff) - m_Offset;
                     DevMsg("- &(%s) = %p\n", m_Name, anchor.get_addr());
                     anchor.mark_symbol(m_Name);
                     return anchor;
@@ -74,16 +82,17 @@ namespace patches::anchors {
 
     struct SGlobVarAnchor : public IModuleFact<SAnchor>, SRefInstrAnchor<void*> {
         public:
-            SGlobVarAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_ptr_off) : SRefInstrAnchor(name, func, instr_off, instr_hex_seq, instr_ptr_off), m_Name(name) {}
+            SGlobVarAnchor(const char *name, IModuleFact<SAnchor>& func, int instr_off, const char *instr_hex_seq, int instr_ptr_off, int var_off = 0) : SRefInstrAnchor(name, func, instr_off, instr_hex_seq, instr_ptr_off), m_Name(name), m_VarOffset(var_off) {}
 
             virtual const char *fact_name() const override { return m_Name; }
 
         private:
             const char *m_Name;
+            int m_VarOffset;
 
             virtual SAnchor determine_value(CModule& module) override {
                 //Obtain and check the global pointer from the instruction
-                uint8_t *glob_ptr = (uint8_t*) SRefInstrAnchor<void*>::determine_value(module);
+                uint8_t *glob_ptr = (uint8_t*) SRefInstrAnchor<void*>::determine_value(module) + m_VarOffset;
                 if(glob_ptr < (uint8_t*) module.base_addr() || (uint8_t*) module.base_addr() + module.size() <= glob_ptr) {
                     DevMsg("Obtained out-of-bounds global variable '%s' from anchor instruction %s: %p (module '%s': %p - %p)\n", m_Name, ref_instr_anchor(module).debug_str().c_str(), glob_ptr, module.name(), module.base_addr(), (uint8_t*) module.base_addr() + module.size());
 
@@ -182,6 +191,23 @@ namespace patches::anchors {
         namespace CProp_Portal {
             extern SFuncAnchor Spawn; //Only used to find g_pMatchFramework 
             extern SFuncAnchor DispatchPortalPlacementParticles; //Only used to find g_pGameRules
+        }
+
+        extern SFuncAnchor DataMapInit_CTriggerMultiple;
+        namespace CTriggerMultiple {
+            extern SGlobVarAnchor typedescription_m_OnTrigger;
+
+            extern SMemberOffAnchor m_flWait;
+        }
+
+        namespace CTriggerOnce {
+            extern SFuncAnchor Spawn;
+        }
+
+        namespace CBaseEntityOutput {
+            extern SFuncAnchor Restore;
+
+            extern SMemberOffAnchor m_ActionList;
         }
 
         namespace CPointTeleport {

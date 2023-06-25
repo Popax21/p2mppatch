@@ -14,7 +14,7 @@ class CSuffixArray {
         inline size_t get_max_needle_size() const { return m_MaxNeedleSize; }
         inline size_t get_mem_usage() const { return m_Sequence.size() * sizeof(size_t); }
 
-        bool find_needle(const IByteSequence& needle, size_t *off) const;
+        bool find_needle(const IByteSequence& needle, size_t *off, const IByteSequence *discrim_seq = nullptr, ssize_t discrim_off = 0) const;
 
         size_t *m_SufOffsets;
     private:

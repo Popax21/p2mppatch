@@ -15,6 +15,7 @@
 #include "patches/transitions_fix.hpp"
 #include "patches/player_spawn.hpp"
 #include "patches/player_stuck.hpp"
+#include "patches/door_stuck.hpp"
 #include "patches/env_fade.hpp"
 
 void CMPPatchPlugin::update_patches() {
@@ -90,6 +91,7 @@ bool CMPPatchPlugin::Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn 
         m_PatchRegistrars.emplace_back(new patches::CTransitionsFixPatch());
         m_PatchRegistrars.emplace_back(new patches::CPlayerSpawnPatch());
         m_PatchRegistrars.emplace_back(new patches::CPlayerStuckPatch());
+        m_PatchRegistrars.emplace_back(new patches::CDoorStuckPatch());
         m_PatchRegistrars.emplace_back(new patches::CEnvFadePatch());
 
         //Apply patches

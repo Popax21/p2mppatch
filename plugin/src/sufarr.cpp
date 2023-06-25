@@ -18,7 +18,9 @@ CSuffixArray::~CSuffixArray() {
     m_SufOffsets = nullptr;
 }
 
-bool CSuffixArray::find_needle(const IByteSequence& needle, size_t *off) const {
+bool CSuffixArray::find_needle(const IByteSequence& needle, size_t *off, const IByteSequence *discrim_seq, ssize_t discrim_off) const {
+    if(!needle.has_data()) throw std::invalid_argument("CSuffixArray::find_needle was given a needle without data");
+
     const size_t needle_sz = needle.size();
     if(needle_sz > m_MaxNeedleSize) return false;
 
@@ -38,8 +40,26 @@ bool CSuffixArray::find_needle(const IByteSequence& needle, size_t *off) const {
         if(needle.compare(m_Sequence, 0, m_SufOffsets[suf], needle_sz) != 0) return false;
     }
 
-    //Check if the suffix is unique
-    if(suf+1 < m_Sequence.size() && needle.compare(m_Sequence, 0, m_SufOffsets[suf+1], needle_sz) == 0) return false;
+    if(discrim_seq) {
+        const size_t discrim_sz = discrim_seq->size();
+
+        //Find the suffix which matches the discriminator
+        size_t cur_suf = suf;
+        suf = (size_t) -1;
+        do {
+            if(discrim_seq->compare(m_Sequence, 0, m_SufOffsets[cur_suf] + discrim_off, discrim_sz) == 0) {
+                if(suf != (size_t) -1) return false;
+                suf = cur_suf;
+            }
+
+            cur_suf++;
+        } while(cur_suf < m_Sequence.size() && needle.compare(m_Sequence, 0, m_SufOffsets[cur_suf], needle_sz) == 0);
+
+        if(suf == (size_t) -1) return false;                
+    } else {
+        //Check if the suffix is unique
+        if(suf+1 < m_Sequence.size() && needle.compare(m_Sequence, 0, m_SufOffsets[suf+1], needle_sz) == 0) return false;
+    }
 
     *off = m_SufOffsets[suf];
     return true;

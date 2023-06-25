@@ -171,13 +171,13 @@ void CModule::get_data(uint8_t *buf, size_t off, size_t size) const {
     }
 }
 
-SAnchor CModule::find_seq_anchor(const IByteSequence &seq) const {
+SAnchor CModule::find_seq_anchor(const IByteSequence &seq, IByteSequence *discrim_seq, ssize_t discrim_off) const {
     size_t off;
 
     using namespace std::chrono;
     auto t1 = high_resolution_clock::now();
 
-    if(!m_SufArray->find_needle(seq, &off)) {
+    if(!m_SufArray->find_needle(seq, &off, discrim_seq, discrim_off)) {
         std::stringstream sstream;
         sstream << "Can't find sequence needle [" << seq.size() << " bytes] in module '" << m_Name << "'";
         throw std::runtime_error(sstream.str());

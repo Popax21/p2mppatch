@@ -99,6 +99,23 @@ namespace patches::anchors {
             SFuncAnchor DispatchPortalPlacementParticles("CProp_Portal::DispatchPortalPlacementParticles", "8b 5d 0c 8b 10 50 ff 92 88 00 00 00 83 c4 10 84 c0", 0xe);
         }
 
+        SFuncAnchor DataMapInit_CTriggerMultiple("DataMapInit<CTriggerMultiple>", "83 c4 10 85 c0 0f 85 c6 00 00 00", 0x1f, "c7 05 ?? ?? ?? ?? 03 00 00 00", 0x28);
+        namespace CTriggerMultiple {
+            SGlobVarAnchor typedescription_m_OnTrigger("CTriggerMultiple::typedescription_m_OnTrigger", DataMapInit_CTriggerMultiple, 0xd5, "a3 ?? ?? ?? ??", 1, -0x14);
+
+            SMemberOffAnchor m_flWait("CTriggerMultiple::m_flWait", CTriggerOnce::Spawn, 0x2a, "c7 83 ?? ?? ?? ?? 00 00 80 bf", 2);
+        }
+
+        namespace CTriggerOnce {
+            SFuncAnchor Spawn("CTriggerOnce::Spawn", "53 83 ec 14 8b 5c 24 1c 53 e8", "53 83 ec 14 8b 5c 24 1c", 0, "c7 83 ?? ?? ?? ?? ?? ?? ?? ?? c7 83 ?? ?? ?? ?? 00 00 00 00 c7 83 ?? ?? ?? ?? 00 00 80 bf", 0x16);
+        }
+
+        namespace CBaseEntityOutput {
+            SFuncAnchor Restore("CBaseEntityOutput::Restore", "55 57 56 53 83 ec 14 8b 74 24 2c 8b 06");
+
+            SMemberOffAnchor m_ActionList("CBaseEntityOutput::m_ActionList", Restore, 0x41, "c7 40 ?? ?? ?? ?? 00", 2);
+        }
+
         namespace CPointTeleport {
             SFuncAnchor DoTeleport("CPointTeleport::DoTeleport", "55 57 56 53 83 ec 1c 8b 44 24 34 80 7c 24 40 00");
         }

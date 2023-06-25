@@ -63,7 +63,7 @@ class CModule : public IByteSequence {
         virtual int compare(const uint8_t *buf, size_t off, size_t size) const;
         virtual void get_data(uint8_t *buf, size_t off, size_t size) const;
 
-        virtual SAnchor find_seq_anchor(const IByteSequence &seq) const;
+        virtual SAnchor find_seq_anchor(const IByteSequence &seq, IByteSequence *discrim_seq = nullptr, ssize_t discrim_off = 0) const;
 
         virtual void unprotect();
         virtual void reprotect();
