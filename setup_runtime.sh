@@ -3,4 +3,4 @@ wget -O - https://media.steampowered.com/client/runtime/steam-runtime-sdk_2013-0
 rm -rf runtime
 mv steam-runtime-sdk_2013-09-05 runtime
 cd runtime
-./setup.sh --target=i386 --release --auto-update
+./setup.sh --target="i386 amd64" --release --auto-update
