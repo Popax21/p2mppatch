@@ -11,7 +11,9 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: 'recursive'
-    
+    - name: Install Packages     
+      run: sudo apt-get install build-essential libc6-dev-i386
+
     - name: Cache Runtime
       id: cache-runtime
       uses: actions/cache@v1.2.1
