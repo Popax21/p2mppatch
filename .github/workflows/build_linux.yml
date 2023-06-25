@@ -23,7 +23,7 @@ jobs:
         path: runtime/
         key: ${{ runner.os }}-runtime-${{ hashFiles('./setup_runtime.sh') }}
 
-    - if: ${{ steps.cache-cache_runtime.cache-hit != 'true' }}
+    - if: ${{ steps.cache_runtime.cache-hit != 'true' }}
       name: Setup Runtime
       run: ./setup_runtime.sh
 
