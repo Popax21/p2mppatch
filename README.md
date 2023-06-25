@@ -34,7 +34,6 @@ If you want to build from source, follow these steps:
 - ensure you have cloned the repository recursively - if not, execute `git
   submodule init` and `git submodule update`
 - download and setup the Steam runtime using the `./setup_runtime.sh` script
-- build the SDK using the `./build_sdk.sh` script
 - build the plugin by executing `make` in the `plugin` directory
 - copy the resulting `p2mppatch.so` file into your game's `portal2` directory
 

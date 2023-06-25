@@ -28,9 +28,6 @@ jobs:
       name: Setup Runtime
       run: ./setup_runtime.sh
 
-    - name: Build SDK
-      run: ./build_sdk.sh
-
     - name: Make Plugin
       run: cd plugin && make
 
