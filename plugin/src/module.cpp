@@ -59,7 +59,7 @@ static int check_mod(struct dl_phdr_info *info, size_t size, void *data) {
     params->base_addr = (void*) start_addr;
     params->size = (size_t) (end_addr - start_addr);
 
-    DevMsg("Found module '%s' matching target name '%s' at addr %lx - %lx\n", info->dlpi_name, params->name, start_addr, end_addr);
+    DevMsg("Found module '%s' matching target name '%s' at addr %lx - %lx\n", info->dlpi_name, params->name, (unsigned long) start_addr, (unsigned long) end_addr);
     return 0;
 }
 
