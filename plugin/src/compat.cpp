@@ -1,4 +1,4 @@
-#define _POSIX_THREAD_SAFE_FUNCTIONS
+#include <assert.h>
 #include <time.h>
 #include <math.h>
 
@@ -20,7 +20,8 @@ struct tm *Plat_localtime(const time_t *timep, struct tm *result) {
 #ifdef LINUX
     return localtime_r(timep, result);
 #else
-    return localtime(timep, result);
+    assert(localtime_s(result, timep) == 0);
+    return result;
 #endif
 }
 
