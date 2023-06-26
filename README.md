@@ -7,8 +7,14 @@ generic patches, without the need for any map-specific support scripts, as well
 as by only making the minimum number of changes required for the maps to be
 playable.
 
-Currently, the plugin only works on Linux, however Windows support is planned to
-be added eventually.
+Currently, the plugin only works on Linux. Windows support is theoretically
+possible (the plugin foundation code does contain initial untested Windows
+support code), however as the Windows release of Portal 2 was compiled with an
+entirely different compiler (MSVC vs GCC), all patches would have to be adjusted
+to work on Windows. If you want to help out by doing this yourself, please let
+me know - I will gladly assist you throughout the process, and merge your work
+once you finish. To get started, see `plugin/src/anchors.cpp` and the offsets /
+orig-sequences in the actual patches.
 
 Patches include:
 - removing the player cap from all multiplayer game session
