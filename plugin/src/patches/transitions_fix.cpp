@@ -192,7 +192,7 @@ DETOUR_FUNC void CTransitionsFixPatch::detour_CPortalMPGameRules_ClientCommandKe
     //Add the player to the ready tracker
     SReadyTracker *tracker = get_rules_ready_tracker(rules);
     if(tracker->ready_players.insert(pPlayer).second) {
-        Msg("P2MPPatch | Added CPortal_Player %p to CPortalMPGameRules %p ready tracker, new player count: %d / %d\n", pPlayer, rules, tracker->ready_players.size());
+        Msg("P2MPPatch | Added CPortal_Player %p to CPortalMPGameRules %p ready tracker, new player count: %d / %d\n", pPlayer, rules, tracker->ready_players.size(), tracker->get_req_players());
     }
 }
 
