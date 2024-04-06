@@ -140,7 +140,7 @@ bool CTransitionsFixPatch::SReadyTracker::is_everyone_ready() const {
 
     int req_players = get_req_players();
     DevMsg("CTransitionsFixPatch | SReadyTracker %p ready check: %d / %d players in list / total\n", this, ready_players.size(), req_players);
-    return ready_players.size() >= get_req_players();
+    return ready_players.size() >= req_players;
 }
 
 HOOK_FUNC void CTransitionsFixPatch::hook_CPortalMPGameRules_CPortalMPGameRules(HOOK_ORIG void (*orig)(void*), void *rules) {
