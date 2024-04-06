@@ -81,6 +81,9 @@ namespace patches::anchors {
         }
 
         SGlobVarAnchor g_pLastSpawn("g_pLastSpawn", CPortal_Player::EntSelectSpawnPoint, 0x47, "8b 1d ?? ?? ?? ??", 2);
+        namespace CBasePlayer {            
+            SFuncAnchor EntSelectSpawnPoint("CBasePlayer::EntSelectSpawnPoint", "55 57 56 53 81 ec 88 08 00 00");
+        }
 
         namespace CPortal_Player {
             SFuncAnchor EntSelectSpawnPoint("CPortal_Player::EntSelectSpawnPoint", "57 56 53 8b 7c 24 10 83 ec 0c 8b 10 50", 0x5);
@@ -104,6 +107,8 @@ namespace patches::anchors {
             SGlobVarAnchor typedescription_m_OnTrigger("CTriggerMultiple::typedescription_m_OnTrigger", DataMapInit_CTriggerMultiple, 0xd5, "a3 ?? ?? ?? ??", 1, -0x14);
 
             SMemberOffAnchor m_flWait("CTriggerMultiple::m_flWait", CTriggerOnce::Spawn, 0x2a, "c7 83 ?? ?? ?? ?? 00 00 80 bf", 2);
+
+            SFuncAnchor MultiTouch("CTriggerMultiple::MultiTouch", "56 53 83 ec 0c 8b 5c 24 18 8b 74 24 1c 8b 03 56 53 ff 90 40 03 00 00 83 c4 10 84 c0 74 1a 8b 03", "56 53 83 ec 0c");
         }
 
         namespace CTriggerOnce {

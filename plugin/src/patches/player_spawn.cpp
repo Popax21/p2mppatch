@@ -21,7 +21,7 @@ void **CPlayerSpawnPatch::ptr_g_pGameRules;
 void **CPlayerSpawnPatch::ptr_g_pLastSpawn;
 
 void *(*CPlayerSpawnPatch::UTIL_PlayerByIndex)(int idx);
-void *(*CPlayerSpawnPatch::CPortal_Player_EntSelectSpawnPoint)(void *player);
+void *(*CPlayerSpawnPatch::CBasePlayer_EntSelectSpawnPoint)(void *player);
 void (*CPlayerSpawnPatch::CPointTeleport_DoTeleport)(void *teleport, void *inputdata, Vector *vecOrigin, QAngle *angRotation, uintptr_t bOverrideTarget);
 
 void CPlayerSpawnPatch::register_patches(CMPPatchPlugin& plugin) {
@@ -37,7 +37,7 @@ void CPlayerSpawnPatch::register_patches(CMPPatchPlugin& plugin) {
     ptr_g_pLastSpawn = (void**) anchors::server::g_pLastSpawn.get(plugin.server_module()).get_addr();
 
     UTIL_PlayerByIndex = (void *(*)(int)) anchors::server::UTIL_PlayerByIndex.get(plugin.server_module()).get_addr();
-    CPortal_Player_EntSelectSpawnPoint = (void *(*)(void*)) anchors::server::CPortal_Player::EntSelectSpawnPoint.get(plugin.server_module()).get_addr();
+    CBasePlayer_EntSelectSpawnPoint = (void *(*)(void*)) anchors::server::CBasePlayer::EntSelectSpawnPoint.get(plugin.server_module()).get_addr();
     CPlayerSpawnPatch::CPointTeleport_DoTeleport = (void (*)(void*, void*, Vector*, QAngle*, uintptr_t)) CPointTeleport_DoTeleport.get_addr();
 
     //Patch CPointTeleport::DoTeleport to allow for passing in an entity pointer directly by giving a null inputdata pointer
@@ -95,7 +95,7 @@ DETOUR_FUNC void CPlayerSpawnPatch::detour_CPointTeleport_DoTeleport(void **ptr_
             void *player = UTIL_PlayerByIndex(i);
             if(!player) continue;
 
-            spawn = CPortal_Player_EntSelectSpawnPoint(player);
+            spawn = CBasePlayer_EntSelectSpawnPoint(player);
             if(spawn) break;
         }
     }

@@ -175,6 +175,9 @@ namespace patches::anchors {
         }
 
         extern SGlobVarAnchor g_pLastSpawn;
+        namespace CBasePlayer {
+            extern SFuncAnchor EntSelectSpawnPoint;
+        }
 
         namespace CPortal_Player {
             extern SFuncAnchor EntSelectSpawnPoint;
@@ -198,6 +201,8 @@ namespace patches::anchors {
             extern SGlobVarAnchor typedescription_m_OnTrigger;
 
             extern SMemberOffAnchor m_flWait;
+
+            extern SFuncAnchor MultiTouch;
         }
 
         namespace CTriggerOnce {

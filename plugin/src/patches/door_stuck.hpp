@@ -23,7 +23,7 @@ namespace patches {
             static CGlobalVars *gpGlobals;
             static void **ptr_g_pGameRules;
 
-            HOOK_FUNC static void hook_CTriggerOnce_Spawn(HOOK_ORIG int (*orig)(void*), void *trigger);
+            HOOK_FUNC static void hook_CTriggerMultiple_MultiTouch(HOOK_ORIG int (*orig)(void*, void*), void *trigger, void *pOther);
     };
 }
 

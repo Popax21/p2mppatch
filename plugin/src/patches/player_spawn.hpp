@@ -26,7 +26,7 @@ namespace patches {
             static void **ptr_g_pLastSpawn;
 
             static void *(*UTIL_PlayerByIndex)(int idx);
-            static void *(*CPortal_Player_EntSelectSpawnPoint)(void *player);
+            static void *(*CBasePlayer_EntSelectSpawnPoint)(void *player);
             static void (*CPointTeleport_DoTeleport)(void *teleport, void *inputdata, Vector *vecOrigin, QAngle *angRotation, uintptr_t bOverrideTarget);
 
             DETOUR_FUNC static void detour_CPointTeleport_DoTeleport(void **ptr_teleport, const char **ptr_entName, Vector **ptr_vecOrigin, QAngle **ptr_angRotation);
