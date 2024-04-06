@@ -92,7 +92,7 @@ void CTransitionsFixPatch::register_patches(CMPPatchPlugin& plugin) {
 
     // - CPortal_Player::ClientCommand: replace the SetMapCompleteData nPlayer argument with the player pointer
     SAnchor CPortal_Player_ClientCommand = anchors::server::CPortal_Player::ClientCommand.get(plugin.server_module());
-    plugin.register_patch<CSeqPatch>(CPortal_Player_ClientCommand + 0xbed, new SEQ_MASKED_HEX("e8 ?? ?? ?? ??"), new SEQ_HEX("8b 45 08 90 90"));
+    plugin.register_patch<CSeqPatch>(CPortal_Player_ClientCommand + 0xbef, new SEQ_MASKED_HEX("e8 ?? ?? ?? ??"), new SEQ_HEX("8b 45 08 90 90"));
 
     // - CPortal_Player::OnFullyConnected: detour `if(!m_bDataReceived[0] || !m_bDataReceived[1]) ...`
     SAnchor CPortal_Player_OnFullyConnected = anchors::server::CPortal_Player::OnFullyConnected.get(plugin.server_module());
